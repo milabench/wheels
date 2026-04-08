@@ -23,6 +23,11 @@ on:
         required: true
         type: string
         default: "2.10.0"
+      torch-cuda-arch-list:
+        description: "CUDA architectures to target (semicolon-separated)"
+        required: true
+        type: string
+        default: "7.5;8.0;8.6;8.9;9.0;10.0;12.0;12.1"
       upload-to-release:
         description: "Upload built wheels to a GitHub release"
         type: boolean
@@ -32,7 +37,7 @@ on:
         type: boolean
         default: false
       release-tag:
-        description: "Release tag for uploading wheels (leave empty for auto: torch{X.Y}-cu{MAJMIN})"
+        description: "Release tag (leave empty for auto: torch{X.Y}-cu{MAJMIN})"
         type: string
         default: ""
 
@@ -40,263 +45,17 @@ defaults:
   run:
     shell: bash -x -e -u -o pipefail {0}
 
-env:
-  XFORMERS_VERSION: "0.0.35"
-  TORCHAO_VERSION: "0.16.0"
-  FLASH_ATTN_VERSION: "2.8.3"
-  TORCH_CUDA_ARCH_LIST: "7.5;8.0;8.6;8.9;9.0;10.0;12.0;12.1"
-
 jobs:
-  build-xformers:
-    name: Build xformers
-    runs-on: ${{ inputs.runs-on }}
-    steps:
-      - name: Free disk space
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@v1.0
-        with:
-          swap-size-gb: 10
-
-      - name: Set up Python ${{ inputs.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-
-      - name: Compute version strings
-        run: |
-          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
-          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
-          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
-
-      - name: Install CUDA ${{ inputs.cuda-version }}
-        uses: Jimver/cuda-toolkit@v0.2.30
-        with:
-          cuda: ${{ inputs.cuda-version }}
-          linux-local-args: '["--toolkit"]'
-          method: "network"
-          sub-packages: '["nvcc"]'
-
-      - name: Install PyTorch ${{ inputs.torch-version }}
-        run: |
-          pip install --upgrade pip
-          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
-            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
-
-      - name: Build xformers wheel
-        run: |
-          pip install wheel setuptools cmake ninja packaging
-          git clone --recurse-submodules --branch v${XFORMERS_VERSION} --depth 1 \
-            https://github.com/facebookresearch/xformers.git
-          cd xformers
-          BUILD_VERSION="${XFORMERS_VERSION}" FORCE_CUDA=1 \
-            pip wheel . --no-cache-dir --no-deps --no-build-isolation -w ../wheels/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-xformers
-          path: wheels/*.whl
-
-  build-pyg:
-    runs-on: ${{ inputs.runs-on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: pytorch_cluster
-            version: "1.6.3"
-            repo: https://github.com/rusty1s/pytorch_cluster.git
-          - name: pytorch_sparse
-            version: "0.6.18"
-            repo: https://github.com/rusty1s/pytorch_sparse.git
-          - name: pytorch_scatter
-            version: "2.1.2"
-            repo: https://github.com/rusty1s/pytorch_scatter.git
-    name: Build ${{ matrix.name }}
-    steps:
-      - name: Free disk space
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@v1.0
-        with:
-          swap-size-gb: 10
-
-      - name: Set up Python ${{ inputs.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-
-      - name: Compute version strings
-        run: |
-          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
-          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
-          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
-          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
-          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
-          echo "PT_VER=pt${TORCH_MAJOR}${TORCH_MINOR}" >> $GITHUB_ENV
-
-      - name: Install CUDA ${{ inputs.cuda-version }}
-        uses: Jimver/cuda-toolkit@v0.2.30
-        with:
-          cuda: ${{ inputs.cuda-version }}
-          linux-local-args: '["--toolkit"]'
-          method: "network"
-          sub-packages: '["nvcc"]'
-
-      - name: Install PyTorch ${{ inputs.torch-version }}
-        run: |
-          pip install --upgrade pip
-          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
-            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
-
-      - name: Build ${{ matrix.name }} wheel
-        run: |
-          pip install wheel setuptools cmake ninja packaging
-          git clone --recurse-submodules --branch ${{ matrix.version }} --depth 1 \
-            ${{ matrix.repo }}
-          cd ${{ matrix.name }}
-          sed -i "s/__version__ = '${{ matrix.version }}'/__version__ = '${{ matrix.version }}+${PT_VER}${CUDA_SHORT}'/" setup.py
-          FORCE_CUDA=1 pip wheel . --no-cache-dir --no-deps --no-build-isolation -w ../wheels/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-${{ matrix.name }}
-          path: wheels/*.whl
-
-  build-torchao:
-    name: Build torchao
-    runs-on: ${{ inputs.runs-on }}
-    steps:
-      - name: Free disk space
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@v1.0
-        with:
-          swap-size-gb: 10
-
-      - name: Set up Python ${{ inputs.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-
-      - name: Compute version strings
-        run: |
-          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
-          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
-          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
-
-      - name: Install CUDA ${{ inputs.cuda-version }}
-        uses: Jimver/cuda-toolkit@v0.2.30
-        with:
-          cuda: ${{ inputs.cuda-version }}
-          linux-local-args: '["--toolkit"]'
-          method: "network"
-          sub-packages: '["nvcc"]'
-
-      - name: Install PyTorch ${{ inputs.torch-version }}
-        run: |
-          pip install --upgrade pip
-          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
-            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
-
-      - name: Build torchao wheel
-        run: |
-          pip install wheel setuptools cmake ninja packaging
-          git clone --recurse-submodules --branch v${TORCHAO_VERSION} --depth 1 \
-            https://github.com/pytorch/ao.git
-          cd ao
-          FORCE_CUDA=1 VERSION_SUFFIX=+${CUDA_SHORT} \
-            pip wheel . --no-cache-dir --no-deps --no-build-isolation -w ../wheels/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-torchao
-          path: wheels/*.whl
-
-  build-flash-attention:
-    name: Build flash-attention
-    runs-on: ${{ inputs.runs-on }}
-    steps:
-      - name: Free disk space
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@v1.0
-        with:
-          swap-size-gb: 10
-
-      - name: Set up Python ${{ inputs.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-
-      - name: Compute version strings
-        run: |
-          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
-          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
-          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
-          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
-          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
-          echo "TORCH_SHORT=${TORCH_MAJOR}.${TORCH_MINOR}" >> $GITHUB_ENV
-          echo "WHEEL_CUDA_VERSION=${CUDA_MAJOR}" >> $GITHUB_ENV
-
-      - name: Install CUDA ${{ inputs.cuda-version }}
-        uses: Jimver/cuda-toolkit@v0.2.30
-        with:
-          cuda: ${{ inputs.cuda-version }}
-          linux-local-args: '["--toolkit"]'
-          method: "network"
-          sub-packages: '["nvcc"]'
-
-      - name: Install PyTorch ${{ inputs.torch-version }}
-        run: |
-          pip install --upgrade pip
-          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
-            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
-
-      - name: Build flash-attention wheel
-        run: |
-          pip install wheel setuptools ninja packaging
-          git clone --recurse-submodules --branch v${FLASH_ATTN_VERSION} --depth 1 \
-            https://github.com/Dao-AILab/flash-attention.git
-          cd flash-attention
-
-          export FLASH_ATTENTION_FORCE_CXX11_ABI="TRUE"
-          export MAX_JOBS=2
-          export NVCC_THREADS=2
-          export FLASH_ATTENTION_FORCE_BUILD="TRUE"
-          export FLASH_ATTN_LOCAL_VERSION="cu${WHEEL_CUDA_VERSION}torch${TORCH_SHORT}cxx11abiTRUE"
-
-          pip wheel . --no-cache-dir --no-deps --no-build-isolation -w ../wheels/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-flash-attention
-          path: wheels/*.whl
-
-  upload-wheels:
-    name: Upload wheels to release
-    needs: [build-xformers, build-pyg, build-torchao, build-flash-attention]
-    if: ${{ !cancelled() && inputs.upload-to-release }}
+  create-release:
+    name: Create release
+    if: ${{ inputs.upload-to-release }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
-
-      - name: Download all wheel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: wheels
-          pattern: wheel-*
-          merge-multiple: true
 
       - name: Compute release tag
         id: tag
@@ -311,18 +70,255 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Upload wheels to release
+      - name: Create release (if it does not exist)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -la wheels/
           gh release create "${{ steps.tag.outputs.tag }}" \
             --title "${{ steps.tag.outputs.tag }}" \
             --notes "CUDA wheels for PyTorch ${{ inputs.torch-version }} + CUDA ${{ inputs.cuda-version }}" \
             2>/dev/null || true
 
+  build-xformers:
+    name: Build xformers
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 10
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        run: |
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "CUDA_VERSION=${{ inputs.cuda-version }}" >> $GITHUB_ENV
+          echo "TORCH_CUDA_ARCH_LIST=${{ inputs.torch-cuda-arch-list }}" >> $GITHUB_ENV
+          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
+          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
+          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Install PyTorch
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
+
+      - name: Build xformers
+        run: bash scripts/build-xformers.sh
+
+      - name: Upload wheel to release
+        if: ${{ inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           CLOBBER_FLAG=""
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.tag.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG
+          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG
+
+  build-pyg:
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [pytorch_cluster, pytorch_sparse, pytorch_scatter]
+    name: Build ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 10
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        run: |
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "CUDA_VERSION=${{ inputs.cuda-version }}" >> $GITHUB_ENV
+          echo "TORCH_CUDA_ARCH_LIST=${{ inputs.torch-cuda-arch-list }}" >> $GITHUB_ENV
+          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
+          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
+          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Install PyTorch
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
+
+      - name: Build ${{ matrix.package }}
+        run: bash scripts/build-pyg.sh "${{ matrix.package }}"
+
+      - name: Upload wheel to release
+        if: ${{ inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG
+
+  build-torchao:
+    name: Build torchao
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 10
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        run: |
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "CUDA_VERSION=${{ inputs.cuda-version }}" >> $GITHUB_ENV
+          echo "TORCH_CUDA_ARCH_LIST=${{ inputs.torch-cuda-arch-list }}" >> $GITHUB_ENV
+          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
+          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
+          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Install PyTorch
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
+
+      - name: Build torchao
+        run: bash scripts/build-torchao.sh
+
+      - name: Upload wheel to release
+        if: ${{ inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG
+
+  build-flash-attention:
+    name: Build flash-attention
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 10
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        run: |
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "CUDA_VERSION=${{ inputs.cuda-version }}" >> $GITHUB_ENV
+          echo "TORCH_CUDA_ARCH_LIST=${{ inputs.torch-cuda-arch-list }}" >> $GITHUB_ENV
+          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
+          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
+          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Install PyTorch
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
+
+      - name: Build flash-attention
+        run: bash scripts/build-flash-attention.sh
+
+      - name: Upload wheel to release
+        if: ${{ inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG
