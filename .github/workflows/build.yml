@@ -398,9 +398,9 @@ jobs:
         run: |
           ARCH=$(uname -m)
           ASSETS=$(gh release view "${{ needs.create-release.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^flash_attn-" | grep -q "$ARCH"; then
+          if echo "$ASSETS" | grep "^flash_attn-2" | grep -q "$ARCH"; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::flash-attention ($ARCH) wheel already exists in release, skipping build"
+            echo "::notice::flash-attention 2 ($ARCH) wheel already exists in release, skipping build"
           fi
 
       - name: Free disk space
@@ -448,6 +448,101 @@ jobs:
       - name: Build flash-attention
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-flash-attention.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            if grep -q "already exists" /tmp/upload.log; then
+              echo "::warning::Wheel already exists in release, skipping upload"
+            else
+              exit 1
+            fi
+          }
+
+  build-flash-attention-4:
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+        include:
+          - arch: x86_64
+            runner: ${{ inputs.runs-on-x86 }}
+          - arch: aarch64
+            runner: ${{ inputs.runs-on-arm }}
+    runs-on: ${{ matrix.runner }}
+    name: Build flash-attention-4 (${{ matrix.arch }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCH=$(uname -m)
+          ASSETS=$(gh release view "${{ needs.create-release.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          if echo "$ASSETS" | grep "^flash_attn-4" | grep -q "$ARCH"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::flash-attention 4 ($ARCH) wheel already exists in release, skipping build"
+          fi
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "CUDA_VERSION=${{ inputs.cuda-version }}" >> $GITHUB_ENV
+          echo "TORCH_CUDA_ARCH_LIST=${{ inputs.torch-cuda-arch-list }}" >> $GITHUB_ENV
+          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
+          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
+          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Install PyTorch
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
+
+      - name: Build flash-attention-4
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-flash-attention-4.sh
 
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}

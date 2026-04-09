@@ -13,9 +13,9 @@ WHEEL_CUDA_VERSION := $(CUDA_MAJOR)
 WHEELS_DIR       ?= $(CURDIR)/wheels
 
 .PHONY: all xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
-        torchao flash-attention install-pytorch clean
+        torchao flash-attention flash-attention-4 install-pytorch clean
 
-all: xformers pyg torchao flash-attention
+all: xformers pyg torchao flash-attention flash-attention-4
 
 pyg: pytorch-cluster pytorch-sparse pytorch-scatter
 
@@ -36,6 +36,9 @@ torchao:
 
 flash-attention:
 	bash scripts/build-flash-attention.sh
+
+flash-attention-4:
+	bash scripts/build-flash-attention-4.sh
 
 install-pytorch:
 	pip install --no-cache-dir torch==$(PYTORCH_VERSION) \
