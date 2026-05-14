@@ -32,7 +32,7 @@ pip install wheel setuptools cmake ninja packaging
 git clone --recurse-submodules --branch "$VERSION" --depth 1 "$REPO"
 (
     cd "$PACKAGE"
-    sed -i "s/__version__ = '${VERSION}'/__version__ = '${VERSION}+${PT_VER}${CUDA_SHORT}'/" setup.py
+    sed -i "s/__version__ = '${VERSION}'/__version__ = '${VERSION}+${PT_VER}${ACCEL_SHORT}'/" setup.py
     FORCE_CUDA=1 pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 )
 rm -rf "$PACKAGE"

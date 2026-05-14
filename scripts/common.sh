@@ -1,6 +1,7 @@
 #!/bin/bash
 # Shared configuration loader for build scripts.
 # Reads .env defaults and computes derived version strings.
+# Supports GPU_BACKEND=cuda (default) or GPU_BACKEND=rocm.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -17,18 +18,31 @@ if [ -f "$ENV_FILE" ]; then
     done < "$ENV_FILE"
 fi
 
-# Derived version strings
-CUDA_MAJOR="${CUDA_VERSION%%.*}"
-_rest="${CUDA_VERSION#*.}"
-CUDA_MINOR="${_rest%%.*}"
+export GPU_BACKEND="${GPU_BACKEND:-cuda}"
+
+# PyTorch version strings (backend-independent)
 TORCH_MAJOR="${PYTORCH_VERSION%%.*}"
 _rest="${PYTORCH_VERSION#*.}"
 TORCH_MINOR="${_rest%%.*}"
 
-export CUDA_SHORT="cu${CUDA_MAJOR}${CUDA_MINOR}"
 export PT_VER="pt${TORCH_MAJOR}${TORCH_MINOR}"
 export TORCH_SHORT="${TORCH_MAJOR}.${TORCH_MINOR}"
-export WHEEL_CUDA_VERSION="${CUDA_MAJOR}"
+
+# Backend-specific derived strings
+if [ "$GPU_BACKEND" = "rocm" ]; then
+    ROCM_MAJOR="${ROCM_VERSION%%.*}"
+    ROCM_MINOR="${ROCM_VERSION#*.}"
+    ROCM_MINOR="${ROCM_MINOR%%.*}"
+    export ROCM_SHORT="rocm${ROCM_MAJOR}.${ROCM_MINOR}"
+    export ACCEL_SHORT="${ROCM_SHORT}"
+else
+    CUDA_MAJOR="${CUDA_VERSION%%.*}"
+    _rest="${CUDA_VERSION#*.}"
+    CUDA_MINOR="${_rest%%.*}"
+    export CUDA_SHORT="cu${CUDA_MAJOR}${CUDA_MINOR}"
+    export WHEEL_CUDA_VERSION="${CUDA_MAJOR}"
+    export ACCEL_SHORT="${CUDA_SHORT}"
+fi
 
 export WHEELS_DIR="${WHEELS_DIR:-${ROOT_DIR}/wheels}"
 mkdir -p "$WHEELS_DIR"

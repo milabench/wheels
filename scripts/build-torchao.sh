@@ -12,7 +12,7 @@ git clone --recurse-submodules --branch "v${TORCHAO_VERSION}" --depth 1 \
     https://github.com/pytorch/ao.git
 (
     cd ao
-    FORCE_CUDA=1 VERSION_SUFFIX="+${CUDA_SHORT}" \
+    FORCE_CUDA=1 VERSION_SUFFIX="+${ACCEL_SHORT}" \
         pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 )
 rm -rf ao

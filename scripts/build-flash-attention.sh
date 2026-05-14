@@ -12,9 +12,13 @@ git clone --recurse-submodules --branch "v${FLASH_ATTN_VERSION}" --depth 1 \
     cd flash-attention
     export FLASH_ATTENTION_FORCE_CXX11_ABI="TRUE"
     export MAX_JOBS=2
-    export NVCC_THREADS=2
     export FLASH_ATTENTION_FORCE_BUILD="TRUE"
-    export FLASH_ATTN_LOCAL_VERSION="cu${WHEEL_CUDA_VERSION}torch${TORCH_SHORT}cxx11abiTRUE"
+    if [ "$GPU_BACKEND" = "rocm" ]; then
+        export FLASH_ATTN_LOCAL_VERSION="${ACCEL_SHORT}torch${TORCH_SHORT}cxx11abiTRUE"
+    else
+        export NVCC_THREADS=2
+        export FLASH_ATTN_LOCAL_VERSION="cu${WHEEL_CUDA_VERSION}torch${TORCH_SHORT}cxx11abiTRUE"
+    fi
 
     pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 )
