@@ -2,6 +2,7 @@
 include .env
 
 GPU_BACKEND ?= cuda
+PYTHON      ?= python3.12
 
 CUDA_MAJOR  := $(word 1,$(subst ., ,$(CUDA_VERSION)))
 CUDA_MINOR  := $(word 2,$(subst ., ,$(CUDA_VERSION)))
@@ -23,37 +24,63 @@ else
   ACCEL_SHORT := $(CUDA_SHORT)
 endif
 
+VENV_DIR     := .venv-$(ACCEL_SHORT)
+VENV_SENTINEL := $(VENV_DIR)/.torch-$(PYTORCH_VERSION)
+
+# Activate the venv for every recipe
+export VIRTUAL_ENV := $(CURDIR)/$(VENV_DIR)
+export PATH := $(CURDIR)/$(VENV_DIR)/bin:$(PATH)
+
 .PHONY: all xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
-        torchao flash-attention flash-attention-4 install-pytorch clean
+        torchao flash-attention flash-attention-4 \
+        aiter amdsmi vllm clean
 
 all: xformers pyg torchao flash-attention flash-attention-4
 
 pyg: pytorch-cluster pytorch-sparse pytorch-scatter
 
-xformers:
+# ---------- environment setup (automatic) ----------
+
+$(VENV_DIR):
+	uv venv $(VENV_DIR) --python $(PYTHON) --seed
+
+$(VENV_SENTINEL): | $(VENV_DIR)
+	uv pip install --python $(VENV_DIR)/bin/python \
+		torch==$(PYTORCH_VERSION) \
+		--index-url https://download.pytorch.org/whl/$(ACCEL_SHORT)
+	@touch $@
+
+# ---------- build targets ----------
+
+xformers: $(VENV_SENTINEL)
 	bash scripts/build-xformers.sh
 
-pytorch-cluster:
+pytorch-cluster: $(VENV_SENTINEL)
 	bash scripts/build-pyg.sh pytorch_cluster
 
-pytorch-sparse:
+pytorch-sparse: $(VENV_SENTINEL)
 	bash scripts/build-pyg.sh pytorch_sparse
 
-pytorch-scatter:
+pytorch-scatter: $(VENV_SENTINEL)
 	bash scripts/build-pyg.sh pytorch_scatter
 
-torchao:
+torchao: $(VENV_SENTINEL)
 	bash scripts/build-torchao.sh
 
-flash-attention:
+flash-attention: $(VENV_SENTINEL)
 	bash scripts/build-flash-attention.sh
 
-flash-attention-4:
+flash-attention-4: $(VENV_SENTINEL)
 	bash scripts/build-flash-attention-4.sh
 
-install-pytorch:
-	pip install --no-cache-dir torch==$(PYTORCH_VERSION) \
-		--index-url https://download.pytorch.org/whl/$(ACCEL_SHORT)
+aiter: $(VENV_SENTINEL)
+	bash scripts/build-aiter.sh
+
+amdsmi: $(VENV_SENTINEL)
+	bash scripts/build-amdsmi.sh
+
+vllm: flash-attention aiter amdsmi
+	bash scripts/build-vllm.sh
 
 clean:
-	rm -rf wheels/
+	rm -rf wheels/ .venv-*/

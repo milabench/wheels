@@ -481,3 +481,314 @@ jobs:
               exit 1
             fi
           }
+
+  build-aiter:
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
+    runs-on: ${{ inputs.runs-on-x86 }}
+    name: Build aiter (ROCm ${{ matrix.rocm-version }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compute release tag
+        id: rel
+        run: |
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+          echo "tag=torch${TORCH_MAJOR}.${TORCH_MINOR}-rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_OUTPUT
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCH=$(uname -m)
+          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          if echo "$ASSETS" | grep "^aiter-" | grep -q "$ARCH"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::aiter ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+          fi
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "GPU_BACKEND=rocm" >> $GITHUB_ENV
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "ROCM_VERSION=${{ matrix.rocm-version }}" >> $GITHUB_ENV
+          echo "PYTORCH_ROCM_ARCH=${{ inputs.pytorch-rocm-arch }}" >> $GITHUB_ENV
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          echo "ROCM_SHORT=rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_ENV
+
+      - name: Install ROCm ${{ matrix.rocm-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          sudo mkdir -p --mode=0755 /etc/apt/keyrings
+          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+          CODENAME=$(lsb_release -cs)
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list
+          sudo apt-get update
+          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev
+
+      - name: Install PyTorch (ROCm)
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
+
+      - name: Build aiter
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-aiter.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            if grep -q "already exists" /tmp/upload.log; then
+              echo "::warning::Wheel already exists in release, skipping upload"
+            else
+              exit 1
+            fi
+          }
+
+  build-amdsmi:
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
+    runs-on: ${{ inputs.runs-on-x86 }}
+    name: Build amdsmi (ROCm ${{ matrix.rocm-version }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compute release tag
+        id: rel
+        run: |
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+          echo "tag=torch${TORCH_MAJOR}.${TORCH_MINOR}-rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_OUTPUT
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCH=$(uname -m)
+          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          if echo "$ASSETS" | grep "^amdsmi-" | grep -q "$ARCH"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::amdsmi ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+          fi
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "GPU_BACKEND=rocm" >> $GITHUB_ENV
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "ROCM_VERSION=${{ matrix.rocm-version }}" >> $GITHUB_ENV
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          echo "ROCM_SHORT=rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_ENV
+
+      - name: Install ROCm ${{ matrix.rocm-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          sudo mkdir -p --mode=0755 /etc/apt/keyrings
+          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+          CODENAME=$(lsb_release -cs)
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list
+          sudo apt-get update
+          sudo apt-get install -y rocm-smi-lib amd-smi-lib
+
+      - name: Build amdsmi
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-amdsmi.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            if grep -q "already exists" /tmp/upload.log; then
+              echo "::warning::Wheel already exists in release, skipping upload"
+            else
+              exit 1
+            fi
+          }
+
+  build-vllm:
+    needs: [create-release, build-flash-attention, build-aiter, build-amdsmi]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
+    runs-on: ${{ inputs.runs-on-x86 }}
+    name: Build vllm (ROCm ${{ matrix.rocm-version }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compute release tag
+        id: rel
+        run: |
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+          echo "tag=torch${TORCH_MAJOR}.${TORCH_MINOR}-rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_OUTPUT
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCH=$(uname -m)
+          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          if echo "$ASSETS" | grep "^vllm-" | grep -q "$ARCH"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::vllm ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+          fi
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "GPU_BACKEND=rocm" >> $GITHUB_ENV
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "ROCM_VERSION=${{ matrix.rocm-version }}" >> $GITHUB_ENV
+          echo "PYTORCH_ROCM_ARCH=${{ inputs.pytorch-rocm-arch }}" >> $GITHUB_ENV
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          echo "ROCM_SHORT=rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_ENV
+
+      - name: Install ROCm ${{ matrix.rocm-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          sudo mkdir -p --mode=0755 /etc/apt/keyrings
+          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+          CODENAME=$(lsb_release -cs)
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list
+          sudo apt-get update
+          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev rocm-smi-lib amd-smi-lib
+
+      - name: Install PyTorch (ROCm)
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
+
+      - name: Download dependency wheels from release
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p wheels
+          for prefix in flash_attn aiter amdsmi; do
+            ASSET=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q ".assets[].name" 2>/dev/null \
+              | grep "^${prefix}-" | head -1 || true)
+            if [ -n "$ASSET" ]; then
+              echo "==> Downloading $ASSET"
+              gh release download "${{ steps.rel.outputs.tag }}" -p "$ASSET" -D wheels/
+            else
+              echo "::warning::No ${prefix} wheel found in release ${{ steps.rel.outputs.tag }}"
+            fi
+          done
+
+      - name: Build vllm
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-vllm.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          for whl in wheels/vllm-*.whl; do
+            [ -f "$whl" ] || continue
+            gh release upload "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+              if grep -q "already exists" /tmp/upload.log; then
+                echo "::warning::Wheel already exists in release, skipping upload"
+              else
+                exit 1
+              fi
+            }
+          done

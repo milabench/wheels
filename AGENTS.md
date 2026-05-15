@@ -58,6 +58,9 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 | torchao | `TORCHAO_VERSION` | `v{VERSION}` | `torchao-` | Uses `VERSION_SUFFIX` env var |
 | flash-attn (FA2) | `FLASH_ATTN_VERSION` | `v{VERSION}` | `flash_attn-2` | FA2+FA3 combined |
 | flash-attn-4 (FA4) | `FLASH_ATTN_4_TAG` | `fa4-v4.0.0.betaN` (full tag) | `flash_attn_4-` | Pure Python (py3-none-any), built from `flash_attn/cute/` via `python -m build`. CUDA workflow only (backend-agnostic). |
+| aiter | `AITER_VERSION` | `v{VERSION}` (full tag) | `aiter-` | ROCm-only. GPU kernel library from ROCm/aiter. Built with `PREBUILD_KERNELS=1`. |
+| amdsmi | (none, from ROCm toolkit) | N/A | `amdsmi-` | ROCm-only. Python wrapper built from `/opt/rocm/share/amd_smi`. |
+| vllm | `VLLM_VERSION` | `v{VERSION}` | `vllm-` | ROCm-only (for now). Built with `VLLM_TARGET_DEVICE=rocm`. Depends on flash-attn, aiter, amdsmi. |
 
 ## Key Env Vars in Build Scripts
 

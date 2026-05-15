@@ -33,6 +33,13 @@ git clone --recurse-submodules --branch "$VERSION" --depth 1 "$REPO"
 (
     cd "$PACKAGE"
     sed -i "s/__version__ = '${VERSION}'/__version__ = '${VERSION}+${PT_VER}${ACCEL_SHORT}'/" setup.py
+
+    PATCH_DIR="${ROOT_DIR}/patches/${PACKAGE}"
+    if [ -d "$PATCH_DIR" ]; then
+        echo "==> Applying patches from patches/${PACKAGE}/"
+        cp -rv "$PATCH_DIR"/. .
+    fi
+
     FORCE_CUDA=1 pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 )
 rm -rf "$PACKAGE"
