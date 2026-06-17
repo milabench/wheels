@@ -144,7 +144,7 @@ jobs:
 
       - name: Install CUDA ${{ inputs.cuda-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        uses: Jimver/cuda-toolkit@v0.2.30
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: ${{ inputs.cuda-version }}
           linux-local-args: '["--toolkit"]'
@@ -241,7 +241,7 @@ jobs:
 
       - name: Install CUDA ${{ inputs.cuda-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        uses: Jimver/cuda-toolkit@v0.2.30
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: ${{ inputs.cuda-version }}
           linux-local-args: '["--toolkit"]'
@@ -336,7 +336,7 @@ jobs:
 
       - name: Install CUDA ${{ inputs.cuda-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        uses: Jimver/cuda-toolkit@v0.2.30
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: ${{ inputs.cuda-version }}
           linux-local-args: '["--toolkit"]'
@@ -431,7 +431,7 @@ jobs:
 
       - name: Install CUDA ${{ inputs.cuda-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        uses: Jimver/cuda-toolkit@v0.2.30
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: ${{ inputs.cuda-version }}
           linux-local-args: '["--toolkit"]'
