@@ -31,13 +31,26 @@ VENV_SENTINEL := $(VENV_DIR)/.torch-$(PYTORCH_VERSION)
 export VIRTUAL_ENV := $(CURDIR)/$(VENV_DIR)
 export PATH := $(CURDIR)/$(VENV_DIR)/bin:$(PATH)
 
-.PHONY: all xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
+MATRIX_PYTORCH_VERSIONS ?= 2.10.0 2.11.0 2.12.0
+MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
+
+.PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
         torchao flash-attention flash-attention-4 \
         aiter amdsmi vllm clean
 
 all: xformers pyg torchao flash-attention flash-attention-4
 
 pyg: pytorch-cluster pytorch-sparse pytorch-scatter
+
+matrix:
+	@for pt in $(MATRIX_PYTORCH_VERSIONS); do \
+		for cuda in $(MATRIX_CUDA_VERSIONS); do \
+			echo "===== Dispatching: PyTorch $$pt + CUDA $$cuda ====="; \
+			gh workflow run build.yml \
+				-f torch-version=$$pt \
+				-f cuda-version=$$cuda; \
+		done; \
+	done
 
 # ---------- environment setup (automatic) ----------
 
