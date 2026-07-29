@@ -38,11 +38,20 @@ if [ "$GPU_BACKEND" = "rocm" ]; then
 
     # Prefer the AMD toolkit over Ubuntu's stale hipcc (5.7.x) package.
     export ROCM_PATH="${ROCM_PATH:-/opt/rocm}"
+    export ROCM_HOME="${ROCM_HOME:-$ROCM_PATH}"
     export HIP_PATH="${HIP_PATH:-$ROCM_PATH}"
     # Many CUDA-oriented build systems look for CUDA_HOME; on ROCm it should
     # point at the HIP toolkit so hipcc is used instead of nvcc.
     export CUDA_HOME="${CUDA_HOME:-$ROCM_PATH}"
     export PATH="${ROCM_PATH}/bin:${PATH}"
+    # xformers (and similar) only take the HIP build path when a GPU is
+    # present or HIP_ARCHITECTURES is set — CI runners are CPU-only.
+    if [ -z "${HIP_ARCHITECTURES:-}" ] && [ -n "${PYTORCH_ROCM_ARCH:-}" ]; then
+        # xformers splits HIP_ARCHITECTURES on whitespace; PYTORCH_ROCM_ARCH
+        # uses semicolons.
+        export HIP_ARCHITECTURES="${PYTORCH_ROCM_ARCH//; / }"
+        export HIP_ARCHITECTURES="${HIP_ARCHITECTURES//;/ }"
+    fi
 else
     CUDA_MAJOR="${CUDA_VERSION%%.*}"
     _rest="${CUDA_VERSION#*.}"
