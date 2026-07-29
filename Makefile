@@ -46,7 +46,7 @@ matrix:
 	@for pt in $(MATRIX_PYTORCH_VERSIONS); do \
 		for cuda in $(MATRIX_CUDA_VERSIONS); do \
 			echo "===== Dispatching: PyTorch $$pt + CUDA $$cuda ====="; \
-			gh workflow run build.yml \
+			gh workflow run build-cuda.yml \
 				-f torch-version=$$pt \
 				-f cuda-version=$$cuda; \
 		done; \

@@ -8,7 +8,7 @@ Builds GPU extension wheels for milabench. Each wheel is built from source again
 - `scripts/common.sh` — Loads `.env`, detects `GPU_BACKEND` (cuda/rocm), computes derived vars (`ACCEL_SHORT`, `PT_VER`, etc.), creates `wheels/` dir.
 - `scripts/build-*.sh` — One script per package. Standalone: `bash scripts/build-xformers.sh`. Set `GPU_BACKEND=rocm` for ROCm builds.
 - `Makefile` — Runs scripts with `.env` exported. `make all` builds everything, `make GPU_BACKEND=rocm <target>` builds for ROCm.
-- `.github/workflows/build.yml` — CUDA CI workflow. Builds all wheels in parallel (x86_64 + aarch64), uploads to a GitHub release.
+- `.github/workflows/build-cuda.yml` — CUDA CI workflow. Builds all wheels in parallel (x86_64 + aarch64), uploads to a GitHub release.
 - `.github/workflows/build-rocm.yml` — ROCm CI workflow. Builds GPU wheels for ROCm (x86_64 only), uploads to a separate release.
 
 ## GPU Backend
@@ -41,7 +41,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
    - Set `MAX_JOBS="${MAX_JOBS:-2}"` to avoid OOM on CI runners.
    - Use `ACCEL_SHORT` (not `CUDA_SHORT`) for version suffixes to support both backends.
 3. Add a target to `Makefile` and include it in `all`.
-4. Add a job to `.github/workflows/build.yml` (CUDA) and/or `.github/workflows/build-rocm.yml` (ROCm):
+4. Add a job to `.github/workflows/build-cuda.yml` (CUDA) and/or `.github/workflows/build-rocm.yml` (ROCm):
    - Copy an existing build job (e.g., `build-torchao`).
    - Update the job name, check pattern (grep for wheel filename prefix), and script path.
    - The job must have `needs: [create-release]`, `if: ${{ !cancelled() }}`, and `permissions: contents: write`.
