@@ -52,6 +52,10 @@ if [ "$GPU_BACKEND" = "rocm" ]; then
         export HIP_ARCHITECTURES="${PYTORCH_ROCM_ARCH//; / }"
         export HIP_ARCHITECTURES="${HIP_ARCHITECTURES//;/ }"
     fi
+    # flash-attn / aiter use GPU_ARCHS (semicolon-separated); "native" probes a GPU.
+    if [ -z "${GPU_ARCHS:-}" ] && [ -n "${PYTORCH_ROCM_ARCH:-}" ]; then
+        export GPU_ARCHS="${PYTORCH_ROCM_ARCH}"
+    fi
 else
     CUDA_MAJOR="${CUDA_VERSION%%.*}"
     _rest="${CUDA_VERSION#*.}"

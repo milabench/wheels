@@ -47,9 +47,11 @@ PKGS=(
     hipblas-dev
     hipblaslt-dev
     hipsparse-dev
+    hipsolver-dev
     hipfft-dev
     hiprand-dev
     rocblas-dev
+    rocsolver-dev
     rocthrust-dev
     hipcub-dev
     rocprim-dev
