@@ -37,7 +37,8 @@ EOF
 
 sudo apt-get update
 
-# Core HIP build stack + headers needed by PyG / torchao / xformers / aiter.
+# Core HIP build stack + headers pulled in by torch ATen HIP and package
+# extensions (torchao / PyG / xformers / aiter).
 PKGS=(
     hipcc
     hip-dev
@@ -45,6 +46,9 @@ PKGS=(
     rocm-cmake
     hipblas-dev
     hipblaslt-dev
+    hipsparse-dev
+    hipfft-dev
+    hiprand-dev
     rocblas-dev
     rocthrust-dev
     hipcub-dev
@@ -75,4 +79,5 @@ command -v hipcc
 hipcc --version || true
 ls /opt/rocm/include/thrust/complex.h \
     /opt/rocm/include/hipblaslt/hipblaslt-ext.hpp \
+    /opt/rocm/include/hipsparse/hipsparse.h \
     2>/dev/null || true
