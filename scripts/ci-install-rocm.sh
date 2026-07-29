@@ -37,26 +37,20 @@ EOF
 
 sudo apt-get update
 
-# Core HIP build stack + headers pulled in by torch ATen HIP and package
-# extensions (torchao / PyG / xformers / aiter).
-PKGS=(
-    hipcc
-    hip-dev
-    rocm-hip-runtime-dev
-    rocm-cmake
-    hipblas-dev
-    hipblaslt-dev
-    hipsparse-dev
-    hipsolver-dev
-    hipfft-dev
-    hiprand-dev
-    rocblas-dev
-    rocsolver-dev
-    rocthrust-dev
-    hipcub-dev
-    rocprim-dev
-    rocm-device-libs
-)
+# Free more space — rocm-hip-sdk is large on GitHub-hosted runners.
+sudo rm -rf \
+    /usr/share/dotnet \
+    /usr/local/lib/android \
+    /opt/ghc \
+    /opt/hostedtoolcache/CodeQL \
+    /usr/local/.ghcup \
+    /usr/share/swift \
+    /usr/local/share/powershell \
+    || true
+
+# Full HIP development stack (headers + libs) instead of cherry-picking
+# individual packages as torch ATen / extensions keep pulling more of them in.
+PKGS=(rocm-hip-sdk rocm-cmake)
 
 if [ "$WITH_AMDSMI" -eq 1 ]; then
     PKGS+=(rocm-smi-lib amd-smi-lib)
@@ -71,15 +65,18 @@ fi
 if [ -n "${GITHUB_ENV:-}" ]; then
     {
         echo "ROCM_PATH=/opt/rocm"
+        echo "ROCM_HOME=/opt/rocm"
         echo "HIP_PATH=/opt/rocm"
         echo "CUDA_HOME=/opt/rocm"
     } >> "$GITHUB_ENV"
 fi
 
-echo "==> ROCm ${ROCM_VERSION} installed"
+echo "==> ROCm ${ROCM_VERSION} installed (rocm-hip-sdk)"
 command -v hipcc
 hipcc --version || true
-ls /opt/rocm/include/thrust/complex.h \
-    /opt/rocm/include/hipblaslt/hipblaslt-ext.hpp \
+df -h / | tail -1
+ls /opt/rocm/include/hipsolver/hipsolver.h \
     /opt/rocm/include/hipsparse/hipsparse.h \
+    /opt/rocm/include/hipblaslt/hipblaslt-ext.hpp \
+    /opt/rocm/include/thrust/complex.h \
     2>/dev/null || true
