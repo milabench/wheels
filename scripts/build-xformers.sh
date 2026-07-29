@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-echo "==> Building xformers ${XFORMERS_VERSION}"
+echo "==> Building xformers ${XFORMERS_VERSION} (${ACCEL_SHORT})"
 
 export MAX_JOBS="${MAX_JOBS:-2}"
 
@@ -13,7 +13,8 @@ git clone --recurse-submodules --branch "v${XFORMERS_VERSION}" --depth 1 \
 (
     cd xformers
 
-    python3 -c "
+    if [ "$GPU_BACKEND" = "cuda" ]; then
+        python3 -c "
 import re, pathlib
 
 p = pathlib.Path('xformers/ops/fmha/cutlass.py')
@@ -42,7 +43,18 @@ p.write_text(t)
 print('  patched USE_FLASH_ATTENTION_3 -> runtime Blackwell detection')
 "
 
-    BUILD_VERSION="${XFORMERS_VERSION}" FORCE_CUDA=1 \
-        pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
+        BUILD_VERSION="${XFORMERS_VERSION}" FORCE_CUDA=1 \
+            pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
+    else
+        # ROCm: do not set FORCE_CUDA / TORCH_CUDA_ARCH_LIST — setup.py would
+        # take the CUDA path and call nvcc. Use the HIP branch instead.
+        unset TORCH_CUDA_ARCH_LIST || true
+        # xformers expects space-separated arches; our env uses semicolons.
+        export HIP_ARCHITECTURES="${PYTORCH_ROCM_ARCH//;/ }"
+        echo "  HIP_ARCHITECTURES=${HIP_ARCHITECTURES}"
+
+        BUILD_VERSION="${XFORMERS_VERSION}" \
+            pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
+    fi
 )
 rm -rf xformers

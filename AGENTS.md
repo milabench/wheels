@@ -51,22 +51,24 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 
 | Package | .env variable | Git tag format | Wheel prefix | Notes |
 |---|---|---|---|---|
-| xformers | `XFORMERS_VERSION` | `v{VERSION}` | `xformers-` | Uses `BUILD_VERSION` env var |
+| xformers | `XFORMERS_VERSION` | `v{VERSION}` | `xformers-` | Uses `BUILD_VERSION`. CUDA: `FORCE_CUDA=1` + Blackwell patches. ROCm: sets `HIP_ARCHITECTURES` from `PYTORCH_ROCM_ARCH`; do **not** set `FORCE_CUDA` (that forces the nvcc path). |
 | pytorch_cluster | `PYTORCH_CLUSTER_VERSION` | `{VERSION}` (no v) | `torch_cluster-` | Version patched via sed in setup.py |
-| pytorch_sparse | `PYTORCH_SPARSE_VERSION` | `{VERSION}` (no v) | `torch_sparse-` | Same as cluster |
-| pytorch_scatter | `PYTORCH_SCATTER_VERSION` | `{VERSION}` (no v) | `torch_scatter-` | Same as cluster |
+| pytorch_sparse | `PYTORCH_SPARSE_VERSION` | `{VERSION}` (no v) | `torch_sparse-` | Same as cluster. ROCm: `patches/pytorch_sparse/csrc/cuda/utils.cuh` avoids 32-bit `__shfl_*_sync` masks (ROCm 7.2+). |
+| pytorch_scatter | `PYTORCH_SCATTER_VERSION` | `{VERSION}` (no v) | `torch_scatter-` | Same as cluster. ROCm: `patches/pytorch_scatter/csrc/cuda/utils.cuh` (same warp-mask fix as sparse). |
 | torchao | `TORCHAO_VERSION` | `v{VERSION}` | `torchao-` | Uses `VERSION_SUFFIX` env var |
 | flash-attn (FA2) | `FLASH_ATTN_VERSION` | `v{VERSION}` | `flash_attn-2` | FA2+FA3 combined |
 | flash-attn-4 (FA4) | `FLASH_ATTN_4_TAG` | `fa4-v4.0.0.betaN` (full tag) | `flash_attn_4-` | Pure Python (py3-none-any), built from `flash_attn/cute/` via `python -m build`. CUDA workflow only (backend-agnostic). |
 | aiter | `AITER_VERSION` | `v{VERSION}` (full tag) | `aiter-` | ROCm-only. GPU kernel library from ROCm/aiter. Built with `PREBUILD_KERNELS=1`. |
 | amdsmi | (none, from ROCm toolkit) | N/A | `amdsmi-` | ROCm-only. Python wrapper built from `/opt/rocm/share/amd_smi`. |
 | vllm | `VLLM_VERSION` | `v{VERSION}` | `vllm-` | CUDA + ROCm. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter, amdsmi. |
+| mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmX.Y` local version. Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
 
 ## Key Env Vars in Build Scripts
 
 - `GPU_BACKEND` — `cuda` (default) or `rocm`. Controls which derived vars are computed.
 - `ACCEL_SHORT` — Unified accelerator suffix for version strings and PyTorch index URLs.
-- `FORCE_CUDA=1` — Build CUDA/HIP extensions without a GPU present. Works for both backends.
+- `FORCE_CUDA=1` — Build CUDA extensions without a GPU present (CUDA builds). Do **not** set this for ROCm xformers — it selects the nvcc path.
+- `HIP_ARCHITECTURES` — Space-separated AMD GPU architectures for xformers ROCm builds (derived from `PYTORCH_ROCM_ARCH`).
 - `FLASH_ATTENTION_FORCE_BUILD=TRUE` — Skip prebuilt wheel download, build from source.
 - `FLASH_ATTENTION_FORCE_CXX11_ABI=TRUE` — Use C++11 ABI (matches modern PyTorch).
 - `MAX_JOBS=2` — Limit parallel compilations to avoid OOM on CI runners (7GB RAM).

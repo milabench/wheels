@@ -630,6 +630,7 @@ jobs:
   build-vllm:
     needs: [create-release, build-flash-attention, build-aiter, build-amdsmi]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -733,6 +734,105 @@ jobs:
             CLOBBER_FLAG="--clobber"
           fi
           for whl in wheels/vllm-*.whl; do
+            [ -f "$whl" ] || continue
+            gh release upload "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+              if grep -q "already exists" /tmp/upload.log; then
+                echo "::warning::Wheel already exists in release, skipping upload"
+              else
+                exit 1
+              fi
+            }
+          done
+
+  build-mslk:
+    needs: [create-release]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
+    runs-on: ${{ inputs.runs-on-x86 }}
+    name: Build mslk (ROCm ${{ matrix.rocm-version }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compute release tag
+        id: rel
+        run: |
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+          echo "tag=torch${TORCH_MAJOR}.${TORCH_MINOR}-rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_OUTPUT
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCH=$(uname -m)
+          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          if echo "$ASSETS" | grep "^mslk-" | grep -q "$ARCH"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::mslk ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+          fi
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "GPU_BACKEND=rocm" >> $GITHUB_ENV
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "ROCM_VERSION=${{ matrix.rocm-version }}" >> $GITHUB_ENV
+          echo "PYTORCH_ROCM_ARCH=${{ inputs.pytorch-rocm-arch }}" >> $GITHUB_ENV
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          echo "ROCM_SHORT=rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_ENV
+
+      - name: Install ROCm ${{ matrix.rocm-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
+
+      - name: Install PyTorch (ROCm)
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir numpy
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
+
+      - name: Build mslk
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-mslk.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          for whl in wheels/mslk-*.whl; do
             [ -f "$whl" ] || continue
             gh release upload "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then

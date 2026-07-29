@@ -35,10 +35,10 @@ MATRIX_PYTORCH_VERSIONS ?= 2.10.0 2.11.0 2.12.0
 MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
 
 .PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
-        torchao flash-attention flash-attention-4 \
+        torchao flash-attention flash-attention-4 mslk \
         aiter amdsmi vllm clean
 
-all: xformers pyg torchao flash-attention flash-attention-4
+all: xformers pyg torchao flash-attention flash-attention-4 mslk
 
 pyg: pytorch-cluster pytorch-sparse pytorch-scatter
 
@@ -85,6 +85,9 @@ flash-attention: $(VENV_SENTINEL)
 
 flash-attention-4: $(VENV_SENTINEL)
 	bash scripts/build-flash-attention-4.sh
+
+mslk: $(VENV_SENTINEL)
+	bash scripts/build-mslk.sh
 
 aiter: $(VENV_SENTINEL)
 	bash scripts/build-aiter.sh
