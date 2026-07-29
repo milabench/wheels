@@ -579,11 +579,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ARCH=$(uname -m)
+          # amdsmi is pure Python (py3-none-any); do not require $ARCH in the name.
           ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^amdsmi-" | grep -q "$ARCH"; then
+          if echo "$ASSETS" | grep -qE '^amdsmi-.*-py3-none-any\.whl$'; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::amdsmi ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+            echo "::notice::amdsmi (py3-none-any) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
           fi
 
       - name: Set up Python
