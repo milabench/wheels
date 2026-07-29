@@ -14,20 +14,20 @@ on:
         type: string
         default: "3.12"
       rocm-versions:
-        description: "ROCm versions to build (JSON array)"
+        description: "ROCm versions to build (JSON array). Must have torch wheels for torch-version (7.0→2.10 only; 7.1/7.2→2.11+)."
         required: true
         type: string
-        default: '["7.0", "7.1", "7.2"]'
+        default: '["7.2"]'
       torch-version:
-        description: "PyTorch version (e.g., 2.10.0)"
+        description: "PyTorch version (e.g., 2.12.0)"
         required: true
         type: string
-        default: "2.10.0"
+        default: "2.12.0"
       pytorch-rocm-arch:
         description: "ROCm GPU architectures to target (semicolon-separated)"
         required: true
         type: string
-        default: "gfx90a;gfx942;gfx1100"
+        default: "gfx950"
       upload-to-release:
         description: "Upload built wheels to a GitHub release"
         type: boolean
@@ -133,20 +133,13 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
 
       - name: Install PyTorch (ROCm)
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: |
           pip install --upgrade pip
+          pip install --no-cache-dir numpy
           pip install --no-cache-dir torch==${{ inputs.torch-version }} \
             --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
 
@@ -238,20 +231,13 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
 
       - name: Install PyTorch (ROCm)
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: |
           pip install --upgrade pip
+          pip install --no-cache-dir numpy
           pip install --no-cache-dir torch==${{ inputs.torch-version }} \
             --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
 
@@ -341,20 +327,13 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
 
       - name: Install PyTorch (ROCm)
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: |
           pip install --upgrade pip
+          pip install --no-cache-dir numpy
           pip install --no-cache-dir torch==${{ inputs.torch-version }} \
             --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
 
@@ -444,20 +423,13 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
 
       - name: Install PyTorch (ROCm)
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: |
           pip install --upgrade pip
+          pip install --no-cache-dir numpy
           pip install --no-cache-dir torch==${{ inputs.torch-version }} \
             --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
 
@@ -547,20 +519,13 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
 
       - name: Install PyTorch (ROCm)
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: |
           pip install --upgrade pip
+          pip install --no-cache-dir numpy
           pip install --no-cache-dir torch==${{ inputs.torch-version }} \
             --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
 
@@ -639,15 +604,7 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y rocm-smi-lib amd-smi-lib
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}" --with-amdsmi
 
       - name: Build amdsmi
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -735,20 +692,13 @@ jobs:
 
       - name: Install ROCm ${{ matrix.rocm-version }}
         if: ${{ steps.check.outputs.skip != 'true' }}
-        run: |
-          sudo mkdir -p --mode=0755 /etc/apt/keyrings
-          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-          CODENAME=$(lsb_release -cs)
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm-version }} ${CODENAME} main" \
-            | sudo tee /etc/apt/sources.list.d/rocm.list
-          sudo apt-get update
-          sudo apt-get install -y hip-dev rocm-cmake hipblas-dev rocblas-dev rocm-smi-lib amd-smi-lib
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}" --with-amdsmi
 
       - name: Install PyTorch (ROCm)
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: |
           pip install --upgrade pip
+          pip install --no-cache-dir numpy
           pip install --no-cache-dir torch==${{ inputs.torch-version }} \
             --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
 

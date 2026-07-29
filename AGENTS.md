@@ -80,4 +80,4 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
   - ROCm tag: `torch{X.Y}-rocm{MAJ}.{MIN}` (e.g., `torch2.10-rocm7.0`)
 - `override-previous: false` (default) skips builds if the wheel already exists in the release (matched by package prefix + CPU arch).
 - CUDA: both x86_64 and aarch64 are built in parallel.
-- ROCm: x86_64 only. Builds for multiple ROCm versions in parallel (default: 7.0, 7.1, 7.2) via `rocm-versions` JSON array input. Each version gets its own release. ROCm toolkit is installed from AMD's APT repository.
+- ROCm: x86_64 only. Builds for multiple ROCm versions in parallel via `rocm-versions` JSON array input (default: `["7.2"]` with torch 2.12.0; 7.0 only has torch 2.10 wheels). Each version gets its own release. Toolkit install is centralized in `scripts/ci-install-rocm.sh` (AMD apt pin + HIP headers for thrust/hipblaslt).
