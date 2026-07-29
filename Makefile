@@ -92,7 +92,11 @@ aiter: $(VENV_SENTINEL)
 amdsmi: $(VENV_SENTINEL)
 	bash scripts/build-amdsmi.sh
 
+ifeq ($(GPU_BACKEND),rocm)
 vllm: flash-attention aiter amdsmi
+else
+vllm: $(VENV_SENTINEL)
+endif
 	bash scripts/build-vllm.sh
 
 clean:

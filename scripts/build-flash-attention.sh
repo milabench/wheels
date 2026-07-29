@@ -13,6 +13,8 @@ git clone --recurse-submodules --branch "v${FLASH_ATTN_VERSION}" --depth 1 \
     export FLASH_ATTENTION_FORCE_CXX11_ABI="TRUE"
     export MAX_JOBS=2
     export FLASH_ATTENTION_FORCE_BUILD="TRUE"
+    # Allow building without a physical GPU (CI runners are CPU-only).
+    export FORCE_CUDA=1
     if [ "$GPU_BACKEND" = "rocm" ]; then
         export FLASH_ATTN_LOCAL_VERSION="${ACCEL_SHORT}torch${TORCH_SHORT}cxx11abiTRUE"
     else

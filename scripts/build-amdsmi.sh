@@ -17,4 +17,13 @@ echo "==> Building amdsmi from ${AMDSMI_DIR}"
 
 pip install wheel setuptools
 
-pip wheel "$AMDSMI_DIR" --no-cache-dir --no-deps --wheel-dir="$WHEELS_DIR/"
+# ROCm ships amd_smi under /opt/rocm with root-owned / read-only files.
+# Building in-place fails with "Operation not permitted" when setuptools
+# copies LICENSE into build/lib. Work from a writable copy instead.
+BUILD_SRC="$(mktemp -d)"
+trap 'rm -rf "$BUILD_SRC"' EXIT
+cp -a "$AMDSMI_DIR"/. "$BUILD_SRC/"
+chmod -R u+rwX "$BUILD_SRC"
+
+pip wheel "$BUILD_SRC" --no-cache-dir --no-deps --no-build-isolation \
+    --wheel-dir="$WHEELS_DIR/"

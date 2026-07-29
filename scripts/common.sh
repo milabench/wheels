@@ -35,6 +35,14 @@ if [ "$GPU_BACKEND" = "rocm" ]; then
     ROCM_MINOR="${ROCM_MINOR%%.*}"
     export ROCM_SHORT="rocm${ROCM_MAJOR}.${ROCM_MINOR}"
     export ACCEL_SHORT="${ROCM_SHORT}"
+
+    # Prefer the AMD toolkit over Ubuntu's stale hipcc (5.7.x) package.
+    export ROCM_PATH="${ROCM_PATH:-/opt/rocm}"
+    export HIP_PATH="${HIP_PATH:-$ROCM_PATH}"
+    # Many CUDA-oriented build systems look for CUDA_HOME; on ROCm it should
+    # point at the HIP toolkit so hipcc is used instead of nvcc.
+    export CUDA_HOME="${CUDA_HOME:-$ROCM_PATH}"
+    export PATH="${ROCM_PATH}/bin:${PATH}"
 else
     CUDA_MAJOR="${CUDA_VERSION%%.*}"
     _rest="${CUDA_VERSION#*.}"
