@@ -71,6 +71,7 @@ jobs:
   build-xformers:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -167,6 +168,7 @@ jobs:
   build-pyg:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -265,6 +267,7 @@ jobs:
   build-torchao:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -361,6 +364,7 @@ jobs:
   build-flash-attention:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -457,6 +461,7 @@ jobs:
   build-aiter:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -553,6 +558,7 @@ jobs:
   build-amdsmi:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -747,6 +753,7 @@ jobs:
   build-mslk:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
