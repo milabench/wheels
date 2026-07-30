@@ -87,6 +87,7 @@ jobs:
   build-xformers:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -182,6 +183,7 @@ jobs:
   build-pyg:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -279,6 +281,7 @@ jobs:
   build-torchao:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -374,6 +377,7 @@ jobs:
   build-flash-attention:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
@@ -470,6 +474,7 @@ jobs:
     name: Build flash-attention-4
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -617,6 +622,7 @@ jobs:
   build-mslk:
     needs: [create-release]
     if: ${{ !cancelled() }}
+    timeout-minutes: 2160
     permissions:
       contents: write
     strategy:
