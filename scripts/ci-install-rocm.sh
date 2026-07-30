@@ -48,9 +48,9 @@ sudo rm -rf \
     /usr/local/share/powershell \
     || true
 
-# Full HIP development stack (headers + libs) instead of cherry-picking
-# individual packages as torch ATen / extensions keep pulling more of them in.
-PKGS=(rocm-hip-sdk rocm-cmake)
+# Full HIP + ML development stacks. rocm-hip-sdk alone omits MIOpen, which
+# torch's LoadHIP.cmake and packages like vllm/mslk require at configure time.
+PKGS=(rocm-hip-sdk rocm-ml-sdk rocm-cmake)
 
 if [ "$WITH_AMDSMI" -eq 1 ]; then
     PKGS+=(rocm-smi-lib amd-smi-lib)
@@ -71,7 +71,7 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     } >> "$GITHUB_ENV"
 fi
 
-echo "==> ROCm ${ROCM_VERSION} installed (rocm-hip-sdk)"
+echo "==> ROCm ${ROCM_VERSION} installed (rocm-hip-sdk + rocm-ml-sdk)"
 command -v hipcc
 hipcc --version || true
 df -h / | tail -1
@@ -79,4 +79,5 @@ ls /opt/rocm/include/hipsolver/hipsolver.h \
     /opt/rocm/include/hipsparse/hipsparse.h \
     /opt/rocm/include/hipblaslt/hipblaslt-ext.hpp \
     /opt/rocm/include/thrust/complex.h \
+    /opt/rocm/include/miopen/miopen.h \
     2>/dev/null || true

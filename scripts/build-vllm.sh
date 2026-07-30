@@ -12,6 +12,21 @@ export VLLM_VERSION_OVERRIDE="${VLLM_VERSION}+${ACCEL_SHORT}"
 
 pip install wheel setuptools cmake ninja packaging setuptools-scm jinja2 regex build
 
+# Install a filtered requirements file without reinstalling torch.
+# Keep the filtered file next to the original so relative `-r other.txt`
+# includes still resolve (pip install -r /dev/stdin breaks that → /dev/...).
+install_build_reqs() {
+    local src="$1"
+    local dst="${src}.filtered"
+    # Drop torch stack pins and extra-index lines that would pull a different
+    # torch build over the one CI already installed.
+    grep -viE '^(torch|torchaudio|torchvision|triton)([=<>~!]|$)' "$src" \
+        | grep -viE '^--extra-index-url' \
+        > "$dst"
+    echo "==> Installing build deps from ${dst}"
+    pip install -r "$dst" || true
+}
+
 git clone --branch "v${VLLM_VERSION}" --depth 1 \
     https://github.com/vllm-project/vllm.git
 (
@@ -29,24 +44,18 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
             fi
         done
 
-        # Build-system deps only — do not reinstall torch from requirements.
         if [ -f requirements/build/rocm.txt ]; then
-            grep -viE '^(torch|torchaudio|torchvision)([=<>~!]|$)' \
-                requirements/build/rocm.txt | pip install -r /dev/stdin || true
+            install_build_reqs requirements/build/rocm.txt
         elif [ -f requirements/rocm-build.txt ]; then
-            grep -viE '^(torch|torchaudio|torchvision)([=<>~!]|$)' \
-                requirements/rocm-build.txt | pip install -r /dev/stdin || true
+            install_build_reqs requirements/rocm-build.txt
         fi
     else
         export VLLM_TARGET_DEVICE=cuda
 
-        # Build-system deps only — do not reinstall torch from requirements.
         if [ -f requirements/build/cuda.txt ]; then
-            grep -viE '^(torch|torchaudio|torchvision)([=<>~!]|$)' \
-                requirements/build/cuda.txt | pip install -r /dev/stdin || true
+            install_build_reqs requirements/build/cuda.txt
         elif [ -f requirements/build.txt ]; then
-            grep -viE '^(torch|torchaudio|torchvision)([=<>~!]|$)' \
-                requirements/build.txt | pip install -r /dev/stdin || true
+            install_build_reqs requirements/build.txt
         fi
     fi
 
