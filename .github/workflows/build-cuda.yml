@@ -1,5 +1,6 @@
 name: Build CUDA Wheels
 
+
 on:
   workflow_dispatch:
     inputs:
@@ -54,6 +55,7 @@ jobs:
   create-release:
     name: Create release
     if: ${{ inputs.upload-to-release }}
+    timeout-minutes: 2160
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -86,7 +88,7 @@ jobs:
 
   build-xformers:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -182,7 +184,7 @@ jobs:
 
   build-pyg:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -280,7 +282,7 @@ jobs:
 
   build-torchao:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -376,7 +378,7 @@ jobs:
 
   build-flash-attention:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -473,7 +475,7 @@ jobs:
   build-flash-attention-4:
     name: Build flash-attention-4
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     runs-on: ubuntu-latest
     permissions:
@@ -520,7 +522,7 @@ jobs:
 
   build-vllm:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -621,7 +623,7 @@ jobs:
 
   build-mslk:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write

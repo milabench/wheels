@@ -1,5 +1,6 @@
 name: Build ROCm Wheels
 
+
 on:
   workflow_dispatch:
     inputs:
@@ -45,10 +46,12 @@ jobs:
   create-release:
     name: Create release (ROCm ${{ matrix.rocm-version }})
     if: ${{ inputs.upload-to-release }}
+    timeout-minutes: 2160
     runs-on: ubuntu-latest
     permissions:
       contents: write
     strategy:
+      fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
     steps:
@@ -70,7 +73,7 @@ jobs:
 
   build-xformers:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -167,7 +170,7 @@ jobs:
 
   build-pyg:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -266,7 +269,7 @@ jobs:
 
   build-torchao:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -363,7 +366,7 @@ jobs:
 
   build-flash-attention:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -460,7 +463,7 @@ jobs:
 
   build-aiter:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -557,7 +560,7 @@ jobs:
 
   build-amdsmi:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -635,7 +638,7 @@ jobs:
 
   build-vllm:
     needs: [create-release, build-flash-attention, build-aiter, build-amdsmi]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -752,7 +755,7 @@ jobs:
 
   build-mslk:
     needs: [create-release]
-    if: ${{ !cancelled() }}
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
       contents: write
