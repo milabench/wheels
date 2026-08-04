@@ -173,7 +173,7 @@ jobs:
         run: bash scripts/build-xformers.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: xformers-rocm${{ matrix.rocm-version }}-x86_64
@@ -281,7 +281,7 @@ jobs:
         run: bash scripts/build-pyg.sh "${{ matrix.package }}"
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.package }}-rocm${{ matrix.rocm-version }}-x86_64
@@ -387,7 +387,7 @@ jobs:
         run: bash scripts/build-torchao.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: torchao-rocm${{ matrix.rocm-version }}-x86_64
@@ -502,7 +502,7 @@ jobs:
         run: bash scripts/build-flash-attention.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: flash-attn-rocm${{ matrix.rocm-version }}-x86_64
@@ -617,7 +617,7 @@ jobs:
         run: bash scripts/build-aiter.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: aiter-rocm${{ matrix.rocm-version }}-x86_64
@@ -704,7 +704,7 @@ jobs:
         run: bash scripts/build-amdsmi.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: amdsmi-rocm${{ matrix.rocm-version }}-py3-none-any
@@ -836,7 +836,7 @@ jobs:
         run: bash scripts/build-vllm.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: vllm-rocm${{ matrix.rocm-version }}-x86_64
@@ -954,7 +954,7 @@ jobs:
         run: bash scripts/build-mslk.sh
 
       - name: Save wheel artifact
-        if: ${ steps.check.outputs.skip != 'true' }
+        if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: mslk-rocm${{ matrix.rocm-version }}-x86_64
