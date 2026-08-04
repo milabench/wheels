@@ -56,6 +56,11 @@ if [ "$GPU_BACKEND" = "rocm" ]; then
     if [ -z "${GPU_ARCHS:-}" ] && [ -n "${PYTORCH_ROCM_ARCH:-}" ]; then
         export GPU_ARCHS="${PYTORCH_ROCM_ARCH}"
     fi
+    # CMake enable_language(HIP) probes the host for a default arch; CPU-only
+    # CI has none, so pass CMAKE_HIP_ARCHITECTURES explicitly (semicolon list).
+    if [ -z "${CMAKE_HIP_ARCHITECTURES:-}" ] && [ -n "${PYTORCH_ROCM_ARCH:-}" ]; then
+        export CMAKE_HIP_ARCHITECTURES="${PYTORCH_ROCM_ARCH}"
+    fi
 else
     CUDA_MAJOR="${CUDA_VERSION%%.*}"
     _rest="${CUDA_VERSION#*.}"

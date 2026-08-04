@@ -33,6 +33,7 @@ git clone --branch "$TAG" --depth 1 \
         AMDGPU_TARGETS="${PYTORCH_ROCM_ARCH//;/,}"
         BUILD_ARGS+=(
             "-DAMDGPU_TARGETS=${AMDGPU_TARGETS}"
+            "-DCMAKE_HIP_ARCHITECTURES=${PYTORCH_ROCM_ARCH}"
             "-DHIP_ROOT_DIR=${HIP_ROOT_DIR:-/opt/rocm}"
         )
     fi

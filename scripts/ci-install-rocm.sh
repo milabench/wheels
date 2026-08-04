@@ -55,6 +55,12 @@ $SUDO rm -rf \
     /usr/local/share/powershell \
     || true
 
+# ROCm's bundled lld (amdgcn-link) is dynamically linked against libxml2.so.2
+# but the AMD packages do not always pull it in on minimal containers, which
+# then fail every hipcc device compile with:
+#   lld: error while loading shared libraries: libxml2.so.2
+$SUDO apt-get install -y --no-install-recommends libxml2
+
 # Full HIP + ML development stacks. rocm-hip-sdk alone omits MIOpen, which
 # torch's LoadHIP.cmake and packages like vllm/mslk require at configure time.
 PKGS=(rocm-hip-sdk rocm-ml-sdk rocm-cmake)
@@ -81,6 +87,29 @@ fi
 echo "==> ROCm ${ROCM_VERSION} installed (rocm-hip-sdk + rocm-ml-sdk)"
 command -v hipcc
 hipcc --version || true
+
+# Fail fast if the linker is still missing runtime deps (e.g. libxml2).
+LLD="$(readlink -f /opt/rocm/lib/llvm/bin/lld 2>/dev/null || true)"
+if [ -n "$LLD" ] && [ -x "$LLD" ]; then
+    if ldd "$LLD" 2>/dev/null | grep -q "not found"; then
+        echo "ERROR: ROCm lld has unresolved shared libraries:" >&2
+        ldd "$LLD" >&2 || true
+        exit 1
+    fi
+fi
+
+# Minimal device compile smoke test (no GPU needed).
+SMOKE="$(mktemp -d)"
+cat > "$SMOKE/smoke.hip" <<'EOF'
+__global__ void k() {}
+int main() { return 0; }
+EOF
+OFFLOAD_ARCH="${PYTORCH_ROCM_ARCH%%;*}"
+OFFLOAD_ARCH="${OFFLOAD_ARCH:-gfx90a}"
+hipcc --offload-arch="$OFFLOAD_ARCH" -c "$SMOKE/smoke.hip" -o "$SMOKE/smoke.o"
+rm -rf "$SMOKE"
+echo "==> hipcc smoke compile ok (--offload-arch=${OFFLOAD_ARCH})"
+
 df -h / | tail -1
 ls /opt/rocm/include/hipsolver/hipsolver.h \
     /opt/rocm/include/hipsparse/hipsparse.h \
