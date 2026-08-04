@@ -29,6 +29,18 @@ on:
         required: true
         type: string
         default: "gfx950"
+
+      runs-on-long-x86:
+        description: "JSON label array for long (>6h) x86_64 builds"
+        required: true
+        type: string
+        default: '["self-hosted","linux","X64","cpu"]'
+      container-image:
+        description: "Container image for long builds (isolates apt/pip from the host)"
+        required: true
+        type: string
+        default: "ubuntu:24.04"
+
       upload-to-release:
         description: "Upload built wheels to a GitHub release"
         type: boolean
@@ -81,10 +93,18 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build xformers (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Compute release tag
         id: rel
@@ -113,7 +133,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -212,7 +232,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -309,7 +329,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -374,10 +394,18 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build flash-attention (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Compute release tag
         id: rel
@@ -406,7 +434,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -471,10 +499,18 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build aiter (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Compute release tag
         id: rel
@@ -503,7 +539,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -646,10 +682,18 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build vllm (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Compute release tag
         id: rel
@@ -678,7 +722,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -763,10 +807,18 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build mslk (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Compute release tag
         id: rel
@@ -795,7 +847,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16

@@ -34,6 +34,23 @@ on:
         required: true
         type: string
         default: "7.5;8.0;8.6;8.9;9.0;10.0;12.0;12.1"
+
+      runs-on-long-x86:
+        description: "JSON label array for long (>6h) x86_64 builds"
+        required: true
+        type: string
+        default: '["self-hosted","linux","X64","cpu"]'
+      runs-on-long-arm:
+        description: "JSON label array for long (>6h) aarch64 builds"
+        required: true
+        type: string
+        default: '["ubuntu-24.04-arm"]'
+      container-image:
+        description: "Container image for long builds (isolates apt/pip from the host)"
+        required: true
+        type: string
+        default: "ubuntu:24.04"
+
       upload-to-release:
         description: "Upload built wheels to a GitHub release"
         type: boolean
@@ -95,16 +112,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ${{ inputs.runs-on-x86 }}
+            runner_json: ${{ inputs.runs-on-long-x86 }}
           - arch: aarch64
-            runner: ${{ inputs.runs-on-arm }}
-    runs-on: ${{ matrix.runner }}
+            runner_json: ${{ inputs.runs-on-long-arm }}
+    runs-on: ${{ fromJSON(matrix.runner_json) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build xformers (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
         id: check
@@ -124,7 +148,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -222,7 +246,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -318,7 +342,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -385,16 +409,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ${{ inputs.runs-on-x86 }}
+            runner_json: ${{ inputs.runs-on-long-x86 }}
           - arch: aarch64
-            runner: ${{ inputs.runs-on-arm }}
-    runs-on: ${{ matrix.runner }}
+            runner_json: ${{ inputs.runs-on-long-arm }}
+    runs-on: ${{ fromJSON(matrix.runner_json) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build flash-attention (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
         id: check
@@ -414,7 +445,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -529,16 +560,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ${{ inputs.runs-on-x86 }}
+            runner_json: ${{ inputs.runs-on-long-x86 }}
           - arch: aarch64
-            runner: ${{ inputs.runs-on-arm }}
-    runs-on: ${{ matrix.runner }}
+            runner_json: ${{ inputs.runs-on-long-arm }}
+    runs-on: ${{ fromJSON(matrix.runner_json) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build vllm (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
         id: check
@@ -560,7 +598,7 @@ jobs:
             /usr/local/lib/android /usr/local/share/boost
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16
@@ -630,16 +668,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ${{ inputs.runs-on-x86 }}
+            runner_json: ${{ inputs.runs-on-long-x86 }}
           - arch: aarch64
-            runner: ${{ inputs.runs-on-arm }}
-    runs-on: ${{ matrix.runner }}
+            runner_json: ${{ inputs.runs-on-long-arm }}
+    runs-on: ${{ fromJSON(matrix.runner_json) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
     name: Build mslk (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
         id: check
@@ -661,7 +706,7 @@ jobs:
             /usr/local/lib/android /usr/local/share/boost
 
       - name: Set up swap space
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: pierotofy/set-swap-space@v1.0
         with:
           swap-size-gb: 16

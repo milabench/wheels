@@ -20,25 +20,32 @@ for arg in "$@"; do
     esac
 done
 
-sudo mkdir -p --mode=0755 /etc/apt/keyrings
+# Job containers usually run as root — sudo is unnecessary / may be missing.
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
+
+$SUDO mkdir -p --mode=0755 /etc/apt/keyrings
 curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
-    | sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+    | $SUDO gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
 
 CODENAME="$(lsb_release -cs)"
 echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VERSION} ${CODENAME} main" \
-    | sudo tee /etc/apt/sources.list.d/rocm.list
+    | $SUDO tee /etc/apt/sources.list.d/rocm.list
 
 # Prefer AMD packages when Ubuntu ships overlapping names (hipcc, etc.).
-sudo tee /etc/apt/preferences.d/rocm-pin-600 >/dev/null <<'EOF'
+$SUDO tee /etc/apt/preferences.d/rocm-pin-600 >/dev/null <<'EOF'
 Package: *
 Pin: release o=repo.radeon.com
 Pin-Priority: 600
 EOF
 
-sudo apt-get update
+$SUDO apt-get update
 
 # Free more space — rocm-hip-sdk is large on GitHub-hosted runners.
-sudo rm -rf \
+$SUDO rm -rf \
     /usr/share/dotnet \
     /usr/local/lib/android \
     /opt/ghc \
@@ -56,7 +63,7 @@ if [ "$WITH_AMDSMI" -eq 1 ]; then
     PKGS+=(rocm-smi-lib amd-smi-lib)
 fi
 
-sudo apt-get install -y "${PKGS[@]}"
+$SUDO apt-get install -y "${PKGS[@]}"
 
 # Make the toolkit visible to later workflow steps.
 if [ -n "${GITHUB_PATH:-}" ]; then
