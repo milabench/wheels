@@ -98,11 +98,12 @@ if [ -n "$LLD" ] && [ -x "$LLD" ]; then
     fi
 fi
 
-# Minimal device compile smoke test (no GPU needed).
+# Minimal device compile smoke test (no GPU needed). Exercises hipcc + the
+# amdgcn linker path that previously failed without libxml2.
 SMOKE="$(mktemp -d)"
 cat > "$SMOKE/smoke.hip" <<'EOF'
-__global__ void k() {}
-int main() { return 0; }
+#include <hip/hip_runtime.h>
+__global__ void k(int *x) { *x = 1; }
 EOF
 OFFLOAD_ARCH="${PYTORCH_ROCM_ARCH%%;*}"
 OFFLOAD_ARCH="${OFFLOAD_ARCH:-gfx90a}"
