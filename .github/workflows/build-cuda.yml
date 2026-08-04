@@ -50,6 +50,11 @@ on:
         required: true
         type: string
         default: "ubuntu:24.04"
+      max-jobs-long:
+        description: "Compile parallelism for long/self-hosted builds (0 = nproc)"
+        required: true
+        type: string
+        default: "0"
 
       upload-to-release:
         description: "Upload built wheels to a GitHub release"
@@ -122,6 +127,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build xformers (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
@@ -419,6 +425,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build flash-attention (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
@@ -570,6 +577,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build vllm (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5
@@ -678,6 +686,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build mslk (${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v5

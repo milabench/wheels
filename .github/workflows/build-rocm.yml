@@ -40,6 +40,11 @@ on:
         required: true
         type: string
         default: "ubuntu:24.04"
+      max-jobs-long:
+        description: "Compile parallelism for long/self-hosted builds (0 = nproc)"
+        required: true
+        type: string
+        default: "0"
 
       upload-to-release:
         description: "Upload built wheels to a GitHub release"
@@ -98,6 +103,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build xformers (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -399,6 +405,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build flash-attention (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -504,6 +511,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build aiter (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -687,6 +695,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build vllm (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -812,6 +821,7 @@ jobs:
       image: ${{ inputs.container-image }}
     env:
       WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
     name: Build mslk (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5

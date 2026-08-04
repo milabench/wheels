@@ -41,3 +41,20 @@ echo "==> Container bootstrap complete"
 uname -m
 gh --version
 python3 --version
+
+# Resolve compile parallelism for fat self-hosted builds.
+# Workflow passes MAX_JOBS=0 to mean "use all cores".
+if [ -z "${MAX_JOBS:-}" ] || [ "${MAX_JOBS}" = "0" ]; then
+    MAX_JOBS="$(nproc)"
+fi
+export MAX_JOBS
+export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-$MAX_JOBS}"
+export NVCC_THREADS="${NVCC_THREADS:-$MAX_JOBS}"
+echo "==> Using MAX_JOBS=${MAX_JOBS} (nproc=$(nproc))"
+if [ -n "${GITHUB_ENV:-}" ]; then
+    {
+        echo "MAX_JOBS=${MAX_JOBS}"
+        echo "CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL}"
+        echo "NVCC_THREADS=${NVCC_THREADS}"
+    } >> "$GITHUB_ENV"
+fi

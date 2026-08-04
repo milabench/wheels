@@ -71,7 +71,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - `HIP_ARCHITECTURES` — Space-separated AMD GPU architectures for xformers ROCm builds (derived from `PYTORCH_ROCM_ARCH`).
 - `FLASH_ATTENTION_FORCE_BUILD=TRUE` — Skip prebuilt wheel download, build from source.
 - `FLASH_ATTENTION_FORCE_CXX11_ABI=TRUE` — Use C++11 ABI (matches modern PyTorch).
-- `MAX_JOBS=2` — Limit parallel compilations to avoid OOM on CI runners (7GB RAM).
+- `MAX_JOBS=2` — Default parallel compilations on GitHub-hosted jobs (avoids OOM on ~7GB RAM). Long/self-hosted jobs set `max-jobs-long` (default `0` = `nproc`) via container bootstrap.
 - `TORCH_CUDA_ARCH_LIST` — Semicolon-separated NVIDIA GPU architectures (CUDA builds).
 - `PYTORCH_ROCM_ARCH` — Semicolon-separated AMD GPU architectures (ROCm builds, e.g., `gfx90a;gfx942`).
 
@@ -83,4 +83,4 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - `override-previous: false` (default) skips builds if the wheel already exists in the release (matched by package prefix + CPU arch).
 - CUDA: both x86_64 and aarch64 are built in parallel.
 - ROCm: x86_64 only. Builds for multiple ROCm versions in parallel via `rocm-versions` JSON array input (default: `["7.2"]` with torch 2.12.0; 7.0 only has torch 2.10 wheels). Each version gets its own release. Toolkit install is centralized in `scripts/ci-install-rocm.sh` (AMD apt pin + HIP headers for thrust/hipblaslt).
-- **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `vllm`, `mslk`) use `runs-on-long-x86` (default self-hosted labels `self-hosted,linux,X64,cpu`) inside `container-image` (default `ubuntu:24.04`) so apt/pip stay in the container. Shorter jobs stay on GitHub-hosted. CUDA aarch64 long jobs use `runs-on-long-arm` (default `ubuntu-24.04-arm`). Bootstrap via `scripts/ci-bootstrap-container.sh`.
+- **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `vllm`, `mslk`) use `runs-on-long-x86` (default self-hosted labels `self-hosted,linux,X64,cpu`) inside `container-image` (default `ubuntu:24.04`) so apt/pip stay in the container. Shorter jobs stay on GitHub-hosted. CUDA aarch64 long jobs use `runs-on-long-arm` (default `ubuntu-24.04-arm`). Bootstrap via `scripts/ci-bootstrap-container.sh`. Long jobs also set `MAX_JOBS` from `max-jobs-long` (default `0` → `nproc`) plus matching `CMAKE_BUILD_PARALLEL_LEVEL` / `NVCC_THREADS`.
