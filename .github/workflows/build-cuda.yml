@@ -4,16 +4,6 @@ name: Build CUDA Wheels
 on:
   workflow_dispatch:
     inputs:
-      runs-on-x86:
-        description: "Runner for x86_64 builds"
-        required: true
-        type: string
-        default: "ubuntu-24.04"
-      runs-on-arm:
-        description: "Runner for aarch64 builds"
-        required: true
-        type: string
-        default: "ubuntu-24.04-arm"
       python-version:
         description: "Python version"
         required: true
@@ -35,16 +25,11 @@ on:
         type: string
         default: "7.5;8.0;8.6;8.9;9.0;10.0;12.0;12.1"
 
-      runs-on-long-x86:
-        description: "JSON label array for long (>6h) x86_64 builds"
+      runs-on-long:
+        description: "Base labels for long (>6h) self-hosted builds; X64/ARM64 is appended from the job arch"
         required: true
         type: string
-        default: '["self-hosted","linux","X64","cpu"]'
-      runs-on-long-arm:
-        description: "JSON label array for long (>6h) aarch64 builds"
-        required: true
-        type: string
-        default: '["ubuntu-24.04-arm"]'
+        default: '["self-hosted","linux","cpu"]'
       container-image:
         description: "Container image for long builds (isolates apt/pip from the host)"
         required: true
@@ -118,11 +103,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Arch label is implicit from the matrix leg (not an input).
+          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
+          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
-            runner_json: ${{ inputs.runs-on-long-x86 }}
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner_json: ${{ inputs.runs-on-long-arm }}
-    runs-on: ${{ fromJSON(matrix.runner_json) }}
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -225,9 +213,9 @@ jobs:
         arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ${{ inputs.runs-on-x86 }}
+            runner: ubuntu-24.04
           - arch: aarch64
-            runner: ${{ inputs.runs-on-arm }}
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     name: Build ${{ matrix.package }} (${{ matrix.arch }})
     steps:
@@ -322,9 +310,9 @@ jobs:
         arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ${{ inputs.runs-on-x86 }}
+            runner: ubuntu-24.04
           - arch: aarch64
-            runner: ${{ inputs.runs-on-arm }}
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     name: Build torchao (${{ matrix.arch }})
     steps:
@@ -416,11 +404,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Arch label is implicit from the matrix leg (not an input).
+          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
+          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
-            runner_json: ${{ inputs.runs-on-long-x86 }}
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner_json: ${{ inputs.runs-on-long-arm }}
-    runs-on: ${{ fromJSON(matrix.runner_json) }}
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -568,11 +559,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Arch label is implicit from the matrix leg (not an input).
+          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
+          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
-            runner_json: ${{ inputs.runs-on-long-x86 }}
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner_json: ${{ inputs.runs-on-long-arm }}
-    runs-on: ${{ fromJSON(matrix.runner_json) }}
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -677,11 +671,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Arch label is implicit from the matrix leg (not an input).
+          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
+          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
-            runner_json: ${{ inputs.runs-on-long-x86 }}
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner_json: ${{ inputs.runs-on-long-arm }}
-    runs-on: ${{ fromJSON(matrix.runner_json) }}
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
     env:

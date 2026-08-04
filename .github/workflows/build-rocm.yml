@@ -4,11 +4,6 @@ name: Build ROCm Wheels
 on:
   workflow_dispatch:
     inputs:
-      runs-on-x86:
-        description: "Runner for x86_64 builds"
-        required: true
-        type: string
-        default: "ubuntu-24.04"
       python-version:
         description: "Python version"
         required: true
@@ -30,11 +25,11 @@ on:
         type: string
         default: "gfx950"
 
-      runs-on-long-x86:
-        description: "JSON label array for long (>6h) x86_64 builds"
+      runs-on-long:
+        description: "Base labels for long (>6h) self-hosted builds; X64 is appended (ROCm is x86_64-only)"
         required: true
         type: string
-        default: '["self-hosted","linux","X64","cpu"]'
+        default: '["self-hosted","linux","cpu"]'
       container-image:
         description: "Container image for long builds (isolates apt/pip from the host)"
         required: true
@@ -98,7 +93,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -205,7 +200,7 @@ jobs:
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
         package: [pytorch_cluster, pytorch_sparse, pytorch_scatter]
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ubuntu-24.04
     name: Build ${{ matrix.package }} (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -303,7 +298,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ubuntu-24.04
     name: Build torchao (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -400,7 +395,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -506,7 +501,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -612,7 +607,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ inputs.runs-on-x86 }}
+    runs-on: ubuntu-24.04
     name: Build amdsmi (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -690,7 +685,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
     container:
       image: ${{ inputs.container-image }}
     env:
@@ -816,7 +811,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ${{ fromJSON(inputs.runs-on-long-x86) }}
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
     container:
       image: ${{ inputs.container-image }}
     env:
