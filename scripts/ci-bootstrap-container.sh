@@ -37,6 +37,11 @@ if ! command -v gh >/dev/null 2>&1; then
     $SUDO apt-get install -y gh
 fi
 
+# gh release upload needs an explicit repo in job containers (no reliable git remote).
+if [ -n "${GITHUB_REPOSITORY:-}" ] && [ -n "${GITHUB_ENV:-}" ]; then
+    echo "GH_REPO=${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
+fi
+
 echo "==> Container bootstrap complete"
 uname -m
 gh --version

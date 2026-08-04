@@ -172,6 +172,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-xformers.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: xformers-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -181,7 +190,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -271,6 +280,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-pyg.sh "${{ matrix.package }}"
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -280,7 +298,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -368,6 +386,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-torchao.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: torchao-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -377,7 +404,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -474,6 +501,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-flash-attention.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-attn-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -483,7 +519,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -580,6 +616,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-aiter.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiter-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -589,7 +634,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -658,6 +703,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-amdsmi.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: amdsmi-rocm${{ matrix.rocm-version }}-py3-none-any
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -667,7 +721,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -781,6 +835,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-vllm.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: vllm-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -792,7 +855,7 @@ jobs:
           fi
           for whl in wheels/vllm-*.whl; do
             [ -f "$whl" ] || continue
-            gh release upload "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then
                 echo "::warning::Wheel already exists in release, skipping upload"
               else
@@ -890,6 +953,15 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         run: bash scripts/build-mslk.sh
 
+      - name: Save wheel artifact
+        if: ${ steps.check.outputs.skip != 'true' }
+        uses: actions/upload-artifact@v4
+        with:
+          name: mslk-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload wheel to release
         if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
         env:
@@ -901,7 +973,7 @@ jobs:
           fi
           for whl in wheels/mslk-*.whl; do
             [ -f "$whl" ] || continue
-            gh release upload "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then
                 echo "::warning::Wheel already exists in release, skipping upload"
               else

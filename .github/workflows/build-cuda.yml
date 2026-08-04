@@ -192,7 +192,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -290,7 +290,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -386,7 +386,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -493,7 +493,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -541,7 +541,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          gh release upload "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
             if grep -q "already exists" /tmp/upload.log; then
               echo "::warning::Wheel already exists in release, skipping upload"
             else
@@ -652,7 +652,7 @@ jobs:
           fi
           for whl in wheels/vllm-*.whl; do
             [ -f "$whl" ] || continue
-            gh release upload "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then
                 echo "::warning::Wheel already exists in release, skipping upload"
               else
@@ -764,7 +764,7 @@ jobs:
           fi
           for whl in wheels/mslk-*.whl; do
             [ -f "$whl" ] || continue
-            gh release upload "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then
                 echo "::warning::Wheel already exists in release, skipping upload"
               else
