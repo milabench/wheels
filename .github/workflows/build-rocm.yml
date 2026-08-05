@@ -34,7 +34,7 @@ on:
         description: "Container image for long builds (isolates apt/pip from the host)"
         required: true
         type: string
-        default: "ubuntu:24.04"
+        default: "ubuntu:22.04"
       max-jobs-long:
         description: "Compile parallelism for long/self-hosted builds (0 = nproc)"
         required: true
@@ -209,7 +209,7 @@ jobs:
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
         package: [pytorch_cluster, pytorch_sparse, pytorch_scatter]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     name: Build ${{ matrix.package }} (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
@@ -334,7 +334,7 @@ jobs:
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
         torchao: ${{ fromJSON(needs.resolve-torchao.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     continue-on-error: ${{ !matrix.torchao.primary }}
     name: Build torchao ${{ matrix.torchao.version }} (ROCm ${{ matrix.rocm-version }})
     steps:
@@ -673,7 +673,7 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     name: Build amdsmi (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5

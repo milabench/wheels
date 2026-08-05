@@ -3,6 +3,9 @@
 # Safe to run as root (typical for job.container) or with sudo.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${SCRIPT_DIR}/ci-assert-build-os.sh"
+
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
 else

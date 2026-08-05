@@ -72,3 +72,8 @@ fi
 
 export WHEELS_DIR="${WHEELS_DIR:-${ROOT_DIR}/wheels}"
 mkdir -p "$WHEELS_DIR"
+
+# CI: enforce Ubuntu 22.04 + not past EOL (local builds skip unless forced).
+if [ -n "${GITHUB_ACTIONS:-}" ] || [ "${WHEELS_ASSERT_BUILD_OS:-}" = "1" ]; then
+    bash "${SCRIPT_DIR}/ci-assert-build-os.sh"
+fi

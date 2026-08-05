@@ -34,7 +34,7 @@ on:
         description: "Container image for long builds (isolates apt/pip from the host)"
         required: true
         type: string
-        default: "ubuntu:24.04"
+        default: "ubuntu:22.04"
       max-jobs-long:
         description: "Compile parallelism for long/self-hosted builds (0 = nproc)"
         required: true
@@ -109,7 +109,7 @@ jobs:
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
@@ -213,9 +213,9 @@ jobs:
         arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     name: Build ${{ matrix.package }} (${{ matrix.arch }})
     steps:
@@ -328,9 +328,9 @@ jobs:
         torchao: ${{ fromJSON(needs.resolve-torchao.outputs.matrix) }}
         include:
           - arch: x86_64
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ !matrix.torchao.primary }}
     name: Build torchao ${{ matrix.torchao.version }} (${{ matrix.arch }})
@@ -431,7 +431,7 @@ jobs:
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
@@ -586,7 +586,7 @@ jobs:
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
@@ -698,7 +698,7 @@ jobs:
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}

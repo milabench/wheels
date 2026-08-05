@@ -14,6 +14,7 @@ Builds GPU extension wheels for milabench. Each wheel is built from source again
 - `.github/workflows/build-rocm.yml` — ROCm CI workflow. Builds GPU wheels for ROCm (x86_64 only), uploads to a separate release.
 - `scripts/trigger-rocm-ci.py` — Discover torch+ROCm combos on the official PyTorch index and dispatch `build-rocm.yml` (dry-run by default; `--trigger` to run).
 - `scripts/trigger-cuda-ci.py` — Same for CUDA / `build-cuda.yml` (`cu130` ↔ toolkit `13.0.0`).
+- `scripts/ci-assert-build-os.sh` — Fail CI if not Ubuntu 22.04, or after 22.04 standard-support EOL (2027-05-31).
 
 ## GPU Backend
 
@@ -89,7 +90,8 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - `override-previous: false` (default) skips builds if the wheel already exists in the release (matched by package prefix + CPU arch).
 - CUDA: both x86_64 and aarch64 are built in parallel.
 - ROCm: x86_64 only. Builds for multiple ROCm versions in parallel via `rocm-versions` JSON array input (default: `["7.2"]` with torch 2.12.0; 7.0 only has torch 2.10 wheels). Each version gets its own release. Toolkit install is centralized in `scripts/ci-install-rocm.sh` (AMD apt pin, `libxml2` for ROCm `lld`, HIP/ML SDKs, and a hipcc smoke compile).
-- **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `vllm`, `mslk`) use `runs-on-long` (default `self-hosted,linux,cpu`; arch label `X64`/`ARM64` is appended from the matrix) inside `container-image` (default `ubuntu:24.04`). Short jobs use GitHub-hosted `ubuntu-24.04` / `ubuntu-24.04-arm`. CUDA still builds x86_64 and aarch64 in parallel; aarch64 long jobs stay on `ubuntu-24.04-arm` until a self-hosted `ARM64` runner exists (then point that matrix leg at `runs-on-long` + `ARM64`). ROCm is x86_64-only. Bootstrap via `scripts/ci-bootstrap-container.sh`. Long jobs set `MAX_JOBS` from `max-jobs-long` (default `0` → `nproc`) plus matching `CMAKE_BUILD_PARALLEL_LEVEL` / `NVCC_THREADS`.
+- **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `vllm`, `mslk`) use `runs-on-long` (default `self-hosted,linux,cpu`; arch label `X64`/`ARM64` is appended from the matrix) inside `container-image` (default `ubuntu:22.04`). Short jobs use GitHub-hosted `ubuntu-22.04` / `ubuntu-22.04-arm`. CUDA still builds x86_64 and aarch64 in parallel; aarch64 long jobs stay on `ubuntu-22.04-arm` until a self-hosted `ARM64` runner exists (then point that matrix leg at `runs-on-long` + `ARM64`). ROCm is x86_64-only. Bootstrap via `scripts/ci-bootstrap-container.sh`. Long jobs set `MAX_JOBS` from `max-jobs-long` (default `0` → `nproc`) plus matching `CMAKE_BUILD_PARALLEL_LEVEL` / `NVCC_THREADS`.
+- **Build OS:** Ubuntu **22.04** (glibc compatibility). `scripts/ci-assert-build-os.sh` fails CI if the runner/container is not 22.04, or after Ubuntu 22.04 standard-support EOL (**2027-05-31**). Wired from container bootstrap and `common.sh` under `GITHUB_ACTIONS`.
 
 ## Triggering CI from the PyTorch index
 
