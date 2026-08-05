@@ -4,12 +4,16 @@ Builds GPU extension wheels for milabench. Each wheel is built from source again
 
 ## File Layout
 
-- `.env` — Single source of truth for all versions. Edit this to update package or infrastructure versions.
+- `.env` — Single source of truth for package/infrastructure versions (except torchao CI matrix). Edit this to update versions.
+- `torchao-matrix.toml` — Maps PyTorch minor → list of torchao versions to build in CI. First entry is preferred; extras are optional older builds.
 - `scripts/common.sh` — Loads `.env`, detects `GPU_BACKEND` (cuda/rocm), computes derived vars (`ACCEL_SHORT`, `PT_VER`, etc.), creates `wheels/` dir.
 - `scripts/build-*.sh` — One script per package. Standalone: `bash scripts/build-xformers.sh`. Set `GPU_BACKEND=rocm` for ROCm builds.
+- `scripts/resolve-torchao-versions.py` — Reads `torchao-matrix.toml` for a torch version; used by CI and `make torchao-matrix`.
 - `Makefile` — Runs scripts with `.env` exported. `make all` builds everything, `make GPU_BACKEND=rocm <target>` builds for ROCm.
 - `.github/workflows/build-cuda.yml` — CUDA CI workflow. Builds all wheels in parallel (x86_64 + aarch64), uploads to a GitHub release.
 - `.github/workflows/build-rocm.yml` — ROCm CI workflow. Builds GPU wheels for ROCm (x86_64 only), uploads to a separate release.
+- `scripts/trigger-rocm-ci.py` — Discover torch+ROCm combos on the official PyTorch index and dispatch `build-rocm.yml` (dry-run by default; `--trigger` to run).
+- `scripts/trigger-cuda-ci.py` — Same for CUDA / `build-cuda.yml` (`cu130` ↔ toolkit `13.0.0`).
 
 ## GPU Backend
 
@@ -29,6 +33,8 @@ Build scripts use `ACCEL_SHORT` for version suffixes, making them backend-agnost
 
 1. Edit `.env` — change the version variable.
 2. Done. Scripts, Makefile, and CI all read from `.env`.
+
+**torchao (CI):** edit `torchao-matrix.toml` instead — add/remove versions under the torch minor key. First entry is preferred (hard fail); extras are optional (`continue-on-error`). Local `make torchao` still uses `TORCHAO_VERSION` from `.env`; `make torchao-matrix` builds the full list for `PYTORCH_VERSION`.
 
 CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow inputs with defaults matching `.env`.
 
@@ -55,7 +61,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 | pytorch_cluster | `PYTORCH_CLUSTER_VERSION` | `{VERSION}` (no v) | `torch_cluster-` | Version patched via sed in setup.py |
 | pytorch_sparse | `PYTORCH_SPARSE_VERSION` | `{VERSION}` (no v) | `torch_sparse-` | Same as cluster. ROCm: `patches/pytorch_sparse/csrc/cuda/utils.cuh` avoids 32-bit `__shfl_*_sync` masks (ROCm 7.2+). |
 | pytorch_scatter | `PYTORCH_SCATTER_VERSION` | `{VERSION}` (no v) | `torch_scatter-` | Same as cluster. ROCm: `patches/pytorch_scatter/csrc/cuda/utils.cuh` (same warp-mask fix as sparse). |
-| torchao | `TORCHAO_VERSION` | `v{VERSION}` | `torchao-` | Uses `VERSION_SUFFIX` env var |
+| torchao | `TORCHAO_VERSION` (local) / `torchao-matrix.toml` (CI) | `v{VERSION}` | `torchao-` | Uses `VERSION_SUFFIX`. CI builds every version listed for the torch minor; non-primary rows are `continue-on-error`. Skip-existing matches the exact version. From 0.17+, CUDA kernels are ABI-stable on torch 2.11+ (only 0.16 stays locked to 2.10). Install pins stay in milabench `[compat.torchao]`. |
 | flash-attn (FA2) | `FLASH_ATTN_VERSION` | `v{VERSION}` | `flash_attn-2` | FA2+FA3 combined |
 | flash-attn-4 (FA4) | `FLASH_ATTN_4_TAG` | `fa4-v4.0.0.betaN` (full tag) | `flash_attn_4-` | Pure Python (py3-none-any), built from `flash_attn/cute/` via `python -m build`. CUDA workflow only (backend-agnostic). |
 | aiter | `AITER_VERSION` | `v{VERSION}` (full tag) | `aiter-` | ROCm-only. GPU kernel library from ROCm/aiter. Built with `PREBUILD_KERNELS=1`. |
@@ -84,3 +90,23 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - CUDA: both x86_64 and aarch64 are built in parallel.
 - ROCm: x86_64 only. Builds for multiple ROCm versions in parallel via `rocm-versions` JSON array input (default: `["7.2"]` with torch 2.12.0; 7.0 only has torch 2.10 wheels). Each version gets its own release. Toolkit install is centralized in `scripts/ci-install-rocm.sh` (AMD apt pin, `libxml2` for ROCm `lld`, HIP/ML SDKs, and a hipcc smoke compile).
 - **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `vllm`, `mslk`) use `runs-on-long` (default `self-hosted,linux,cpu`; arch label `X64`/`ARM64` is appended from the matrix) inside `container-image` (default `ubuntu:24.04`). Short jobs use GitHub-hosted `ubuntu-24.04` / `ubuntu-24.04-arm`. CUDA still builds x86_64 and aarch64 in parallel; aarch64 long jobs stay on `ubuntu-24.04-arm` until a self-hosted `ARM64` runner exists (then point that matrix leg at `runs-on-long` + `ARM64`). ROCm is x86_64-only. Bootstrap via `scripts/ci-bootstrap-container.sh`. Long jobs set `MAX_JOBS` from `max-jobs-long` (default `0` → `nproc`) plus matching `CMAKE_BUILD_PARALLEL_LEVEL` / `NVCC_THREADS`.
+
+## Triggering CI from the PyTorch index
+
+```bash
+# ROCm: list torch+ROCm combos with cp312 linux wheels (dry-run)
+python3 scripts/trigger-rocm-ci.py --min-torch 2.10 --min-rocm 7.0 --latest-patch
+
+# ROCm: dispatch; skip releases that already have assets
+python3 scripts/trigger-rocm-ci.py --min-torch 2.10 --min-rocm 7.0 \
+  --latest-patch --skip-existing --trigger
+
+# CUDA: list torch+CUDA combos (maps cu130 -> cuda-version 13.0.0)
+python3 scripts/trigger-cuda-ci.py --min-torch 2.10 --min-cuda 12.6 --latest-patch
+
+# CUDA: dispatch missing releases
+python3 scripts/trigger-cuda-ci.py --min-torch 2.10 --min-cuda 12.6 \
+  --latest-patch --skip-existing --trigger
+```
+
+ROCm dispatches one workflow run per torch version (all matching ROCm versions in `rocm-versions`). CUDA dispatches one run per `(torch, cuda)` pair (`cuda-version` is a single toolkit string).

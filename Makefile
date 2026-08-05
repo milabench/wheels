@@ -35,7 +35,7 @@ MATRIX_PYTORCH_VERSIONS ?= 2.10.0 2.11.0 2.12.0
 MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
 
 .PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
-        torchao flash-attention flash-attention-4 mslk \
+        torchao torchao-matrix flash-attention flash-attention-4 mslk \
         aiter amdsmi vllm clean
 
 all: xformers pyg torchao flash-attention flash-attention-4 mslk
@@ -79,6 +79,13 @@ pytorch-scatter: $(VENV_SENTINEL)
 
 torchao: $(VENV_SENTINEL)
 	bash scripts/build-torchao.sh
+
+# Build every torchao version listed for PYTORCH_VERSION in torchao-matrix.toml
+torchao-matrix: $(VENV_SENTINEL)
+	@vers=$$(python3 scripts/resolve-torchao-versions.py --torch "$(PYTORCH_VERSION)" --versions-only); \
+	python3 -c "import json,os,subprocess,sys; \
+versions=json.loads(sys.argv[1]); \
+[subprocess.check_call(['bash','scripts/build-torchao.sh'], env={**os.environ, 'TORCHAO_VERSION': v}) for v in versions]" "$$vers"
 
 flash-attention: $(VENV_SENTINEL)
 	bash scripts/build-flash-attention.sh

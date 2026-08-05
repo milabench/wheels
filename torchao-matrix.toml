@@ -1,0 +1,17 @@
+# torchao versions to build per PyTorch minor.
+#
+# Pre-0.17: C++ extensions were locked 1:1 to a torch minor
+#   (https://github.com/pytorch/ao/issues/2919).
+# 0.17+: CUDA kernels are ABI-stable against any torch 2.11+
+#   (https://github.com/pytorch/ao/releases/tag/v0.17.0).
+#   Python-only API still tracks the latest ~3 torch minors.
+#
+# First entry is preferred; remaining are older builds kept available
+# (CI marks them continue-on-error).
+# Install-time constraints stay in milabench platforms.toml [compat.torchao].
+
+[torchao]
+"2.10" = ["0.16.0"]                 # last pre-ABI-stable release
+"2.11" = ["0.18.0", "0.17.0"]       # any 0.17+ is fine on 2.11+
+"2.12" = ["0.18.0", "0.17.0"]
+"2.13" = ["0.18.0", "0.17.0"]

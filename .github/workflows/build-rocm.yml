@@ -306,9 +306,26 @@ jobs:
             fi
           }
 
+  resolve-torchao:
+    name: Resolve torchao versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      versions: ${{ steps.resolve.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve torchao matrix
+        id: resolve
+        run: |
+          python3 scripts/resolve-torchao-versions.py \
+            --torch "${{ inputs.torch-version }}" \
+            --github-output
+
   build-torchao:
-    needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    needs: [create-release, resolve-torchao]
+    if: ${{ always() && !cancelled() && needs.resolve-torchao.result == 'success' }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -316,8 +333,10 @@ jobs:
       fail-fast: false
       matrix:
         rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
+        torchao: ${{ fromJSON(needs.resolve-torchao.outputs.matrix) }}
     runs-on: ubuntu-24.04
-    name: Build torchao (ROCm ${{ matrix.rocm-version }})
+    continue-on-error: ${{ !matrix.torchao.primary }}
+    name: Build torchao ${{ matrix.torchao.version }} (ROCm ${{ matrix.rocm-version }})
     steps:
       - uses: actions/checkout@v5
 
@@ -337,10 +356,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ARCH=$(uname -m)
+          VER="${{ matrix.torchao.version }}"
           ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^torchao-" | grep -q "$ARCH"; then
+          if echo "$ASSETS" | grep -E "^torchao-${VER}([+-]|$)" | grep -q "$ARCH"; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::torchao ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+            echo "::notice::torchao ${VER} ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
           fi
 
       - name: Free disk space
@@ -366,6 +386,7 @@ jobs:
           echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
           echo "ROCM_VERSION=${{ matrix.rocm-version }}" >> $GITHUB_ENV
           echo "PYTORCH_ROCM_ARCH=${{ inputs.pytorch-rocm-arch }}" >> $GITHUB_ENV
+          echo "TORCHAO_VERSION=${{ matrix.torchao.version }}" >> $GITHUB_ENV
           ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
           ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
           echo "ROCM_SHORT=rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_ENV
@@ -390,7 +411,7 @@ jobs:
         if: ${{ steps.check.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: torchao-rocm${{ matrix.rocm-version }}-x86_64
+          name: torchao-${{ matrix.torchao.version }}-rocm${{ matrix.rocm-version }}-x86_64
           path: wheels/*.whl
           if-no-files-found: error
           retention-days: 14
