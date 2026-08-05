@@ -602,7 +602,7 @@ jobs:
         run: |
           ARCH=$(uname -m)
           ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^aiter-" | grep -q "$ARCH"; then
+          if echo "$ASSETS" | grep -E '^(amd_aiter|aiter)-' | grep -q "$ARCH"; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "::notice::aiter ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
           fi
@@ -655,6 +655,124 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aiter-rocm${{ matrix.rocm-version }}-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" wheels/*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            if grep -q "already exists" /tmp/upload.log; then
+              echo "::warning::Wheel already exists in release, skipping upload"
+            else
+              exit 1
+            fi
+          }
+
+  build-mori:
+    needs: [create-release]
+    if: ${{ always() && !cancelled() }}
+    timeout-minutes: 2160
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rocm-version: ${{ fromJSON(inputs.rocm-versions) }}
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
+      PYTORCH_ROCM_ARCH: ${{ inputs.pytorch-rocm-arch }}
+    name: Build mori (ROCm ${{ matrix.rocm-version }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
+        run: bash scripts/ci-bootstrap-container.sh
+
+      - name: Compute release tag
+        id: rel
+        run: |
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+          TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+          echo "tag=torch${TORCH_MAJOR}.${TORCH_MINOR}-rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_OUTPUT
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCH=$(uname -m)
+          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          if echo "$ASSETS" | grep -E '^amd_mori-' | grep -q "$ARCH"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::mori ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
+          fi
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "GPU_BACKEND=rocm" >> $GITHUB_ENV
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "ROCM_VERSION=${{ matrix.rocm-version }}" >> $GITHUB_ENV
+          echo "PYTORCH_ROCM_ARCH=${{ inputs.pytorch-rocm-arch }}" >> $GITHUB_ENV
+          ROCM_MAJOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f1)
+          ROCM_MINOR=$(echo "${{ matrix.rocm-version }}" | cut -d. -f2)
+          echo "ROCM_SHORT=rocm${ROCM_MAJOR}.${ROCM_MINOR}" >> $GITHUB_ENV
+
+      - name: Install ROCm ${{ matrix.rocm-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/ci-install-rocm.sh "${{ matrix.rocm-version }}"
+
+      - name: Install PyTorch (ROCm)
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir numpy
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${ROCM_SHORT}
+
+      - name: Build mori
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-mori.sh
+
+      - name: Save wheel artifact
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mori-rocm${{ matrix.rocm-version }}-x86_64
           path: wheels/*.whl
           if-no-files-found: error
           retention-days: 14
@@ -767,7 +885,7 @@ jobs:
           }
 
   build-vllm:
-    needs: [create-release, build-flash-attention, build-aiter, build-amdsmi]
+    needs: [create-release, build-flash-attention, build-aiter, build-mori, build-amdsmi]
     if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
     permissions:
@@ -860,16 +978,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p wheels
-          for prefix in flash_attn aiter amdsmi; do
-            ASSET=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q ".assets[].name" 2>/dev/null \
-              | grep "^${prefix}-" | head -1 || true)
-            if [ -n "$ASSET" ]; then
-              echo "==> Downloading $ASSET"
-              gh release download "${{ steps.rel.outputs.tag }}" -p "$ASSET" -D wheels/
-            else
-              echo "::warning::No ${prefix} wheel found in release ${{ steps.rel.outputs.tag }}"
-            fi
-          done
+          download_dep() {
+            local label=$1
+            shift
+            local prefix asset=""
+            for prefix in "$@"; do
+              asset=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null \
+                | grep "^${prefix}-" | head -1 || true)
+              if [ -n "$asset" ]; then
+                echo "==> Downloading $asset (${label})"
+                gh release download "${{ steps.rel.outputs.tag }}" -p "$asset" -D wheels/
+                return 0
+              fi
+            done
+            echo "::warning::No ${label} wheel found in release ${{ steps.rel.outputs.tag }}"
+            return 0
+          }
+          download_dep flash_attn flash_attn
+          download_dep aiter amd_aiter aiter
+          download_dep mori amd_mori mori
+          download_dep amdsmi amdsmi
 
       - name: Build vllm
         if: ${{ steps.check.outputs.skip != 'true' }}

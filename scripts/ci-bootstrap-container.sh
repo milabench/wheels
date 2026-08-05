@@ -58,9 +58,12 @@ uv --version
 echo "==> Installing Python ${PYTHON_VERSION} via uv"
 # System-wide install so all steps see the same interpreter.
 $SUDO mkdir -p /opt/uv-python
-$SUDO env UV_PYTHON_INSTALL_DIR=/opt/uv-python PATH="${PATH}" \
+export UV_PYTHON_INSTALL_DIR=/opt/uv-python
+# only-managed so an unrelated venv or the distro python is never picked up.
+export UV_PYTHON_PREFERENCE=only-managed
+$SUDO env UV_PYTHON_INSTALL_DIR=/opt/uv-python UV_PYTHON_PREFERENCE=only-managed PATH="${PATH}" \
     uv python install "${PYTHON_VERSION}"
-PY_PATH="$(UV_PYTHON_INSTALL_DIR=/opt/uv-python uv python find "${PYTHON_VERSION}")"
+PY_PATH="$(uv python find "${PYTHON_VERSION}")"
 if [ -z "${PY_PATH}" ] || [ ! -x "${PY_PATH}" ]; then
     echo "::error::uv python find ${PYTHON_VERSION} failed"
     exit 1
@@ -69,25 +72,18 @@ fi
 echo "==> Python at ${PY_PATH}"
 "${PY_PATH}" --version
 
-$SUDO mkdir -p "${WHEELS_PYTHON_ROOT}/bin"
-$SUDO ln -sfn "${PY_PATH}" "${WHEELS_PYTHON_ROOT}/bin/python"
-$SUDO ln -sfn "${PY_PATH}" "${WHEELS_PYTHON_ROOT}/bin/python3"
+# uv-managed interpreters are marked externally managed, so build steps must
+# install into a venv rather than the interpreter itself.
+echo "==> Creating build environment at ${WHEELS_PYTHON_ROOT}"
+$SUDO mkdir -p "${WHEELS_PYTHON_ROOT}"
+$SUDO chown -R "$(id -u):$(id -g)" "${WHEELS_PYTHON_ROOT}"
+uv venv --seed --python "${PY_PATH}" "${WHEELS_PYTHON_ROOT}"
 
-# Prefer python -m pip so we never pick up a mismatched host pip.
-$SUDO tee "${WHEELS_PYTHON_ROOT}/bin/pip" >/dev/null <<EOF
-#!/bin/bash
-exec "${PY_PATH}" -m pip "\$@"
-EOF
-$SUDO tee "${WHEELS_PYTHON_ROOT}/bin/pip3" >/dev/null <<EOF
-#!/bin/bash
-exec "${PY_PATH}" -m pip "\$@"
-EOF
-$SUDO chmod +x "${WHEELS_PYTHON_ROOT}/bin/pip" "${WHEELS_PYTHON_ROOT}/bin/pip3"
-
-uv pip install --python "${PY_PATH}" --upgrade pip setuptools wheel
+uv pip install --python "${WHEELS_PYTHON_ROOT}/bin/python" --upgrade pip setuptools wheel
 "${WHEELS_PYTHON_ROOT}/bin/python" -c "import sys; print(sys.version); print(sys.executable)"
 "${WHEELS_PYTHON_ROOT}/bin/pip" --version
 
+export VIRTUAL_ENV="${WHEELS_PYTHON_ROOT}"
 export PATH="${WHEELS_PYTHON_ROOT}/bin:${UV_INSTALL_DIR}:${PATH}"
 if [ -n "${GITHUB_PATH:-}" ]; then
     {
@@ -99,7 +95,8 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     {
         echo "UV_PYTHON_INSTALL_DIR=/opt/uv-python"
         echo "UV=${UV_INSTALL_DIR}/uv"
-        echo "WHEELS_PYTHON=${PY_PATH}"
+        echo "VIRTUAL_ENV=${WHEELS_PYTHON_ROOT}"
+        echo "WHEELS_PYTHON=${WHEELS_PYTHON_ROOT}/bin/python"
     } >> "$GITHUB_ENV"
 fi
 

@@ -50,16 +50,31 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
         export VLLM_TARGET_DEVICE=rocm
         # Do not set FORCE_CUDA on ROCm — it is a CUDA-extension escape hatch.
 
-        for dep in flash_attn aiter amdsmi; do
-            whl=$(find "$WHEELS_DIR" -name "${dep}-*.whl" 2>/dev/null | head -1)
+        # Prefer amd_* wheel names produced by current ROCm package builds;
+        # keep unprefixed names as fallbacks for older releases.
+        install_rocm_dep() {
+            local label=$1
+            shift
+            local whl="" pattern
+            for pattern in "$@"; do
+                whl=$(find "$WHEELS_DIR" -name "$pattern" 2>/dev/null | head -1 || true)
+                if [ -n "$whl" ]; then
+                    break
+                fi
+            done
             if [ -n "$whl" ]; then
-                echo "==> Installing dependency: $whl"
+                echo "==> Installing dependency (${label}): $whl"
                 # --no-deps so flash_attn/etc. cannot pull a CUDA torch.
                 pip install --no-deps "$whl"
             else
-                echo "==> WARNING: no ${dep} wheel in ${WHEELS_DIR}"
+                echo "==> WARNING: no ${label} wheel in ${WHEELS_DIR}"
             fi
-        done
+        }
+
+        install_rocm_dep flash_attn "flash_attn-*.whl"
+        install_rocm_dep aiter "amd_aiter-*.whl" "aiter-*.whl"
+        install_rocm_dep mori "amd_mori-*.whl" "mori-*.whl"
+        install_rocm_dep amdsmi "amdsmi-*.whl"
     else
         export VLLM_TARGET_DEVICE=cuda
         export FORCE_CUDA=1

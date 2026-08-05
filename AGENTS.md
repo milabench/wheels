@@ -65,9 +65,10 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 | torchao | `TORCHAO_VERSION` (local) / `torchao-matrix.toml` (CI) | `v{VERSION}` | `torchao-` | Uses `VERSION_SUFFIX`. CI builds every version listed for the torch minor; non-primary rows are `continue-on-error`. Skip-existing matches the exact version. From 0.17+, CUDA kernels are ABI-stable on torch 2.11+ (only 0.16 stays locked to 2.10). Install pins stay in milabench `[compat.torchao]`. |
 | flash-attn (FA2) | `FLASH_ATTN_VERSION` | `v{VERSION}` | `flash_attn-2` | FA2+FA3 combined |
 | flash-attn-4 (FA4) | `FLASH_ATTN_4_TAG` | `fa4-v4.0.0.betaN` (full tag) | `flash_attn_4-` | Pure Python (py3-none-any), built from `flash_attn/cute/` via `python -m build`. CUDA workflow only (backend-agnostic). |
-| aiter | `AITER_VERSION` | `v{VERSION}` (full tag) | `aiter-` | ROCm-only. GPU kernel library from ROCm/aiter. Built with `PREBUILD_KERNELS=1`. |
+| aiter | `AITER_VERSION` | `v{VERSION}` (full tag) | `aiter-` / `amd_aiter-` | ROCm-only. GPU kernel library from ROCm/aiter. Built with `PREBUILD_KERNELS=1`. |
+| mori | `MORI_VERSION` | `v{VERSION}` (full tag) | `amd_mori-` | ROCm-only. Modular RDMA Interface from [ROCm/mori](https://github.com/ROCm/mori). Needs recursive submodules + `libpci-dev` / `libibverbs-dev`. Archs via `MORI_GPU_ARCHS` (default `gfx942;gfx950`, else `PYTORCH_ROCM_ARCH`). |
 | amdsmi | (none, from ROCm toolkit) | N/A | `amdsmi-` | ROCm-only. Python wrapper built from `/opt/rocm/share/amd_smi`. |
-| vllm | `VLLM_VERSION` | `v{VERSION}` | `vllm-` | CUDA + ROCm. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter, amdsmi. |
+| vllm | `VLLM_VERSION` | `v{VERSION}` | `vllm-` | CUDA + ROCm. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter (`amd_aiter`), mori (`amd_mori`), amdsmi. |
 | mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmX.Y` local version. Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
 
 ## Key Env Vars in Build Scripts
@@ -81,6 +82,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - `MAX_JOBS=2` — Default parallel compilations on GitHub-hosted jobs (avoids OOM on ~7GB RAM). Long/self-hosted jobs set `max-jobs-long` (default `0` = `nproc`) via container bootstrap.
 - `TORCH_CUDA_ARCH_LIST` — Semicolon-separated NVIDIA GPU architectures (CUDA builds).
 - `PYTORCH_ROCM_ARCH` — Semicolon-separated AMD GPU architectures (ROCm builds, e.g., `gfx90a;gfx942`).
+- `MORI_GPU_ARCHS` — Semicolon-separated AMD GPU architectures for MORI (defaults to `PYTORCH_ROCM_ARCH` if unset).
 
 ## CI Behavior
 
@@ -90,7 +92,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - `override-previous: false` (default) skips builds if the wheel already exists in the release (matched by package prefix + CPU arch).
 - CUDA: both x86_64 and aarch64 are built in parallel.
 - ROCm: x86_64 only. Builds for multiple ROCm versions in parallel via `rocm-versions` JSON array input (default: `["7.2"]` with torch 2.12.0; 7.0 only has torch 2.10 wheels). Each version gets its own release. Toolkit install is centralized in `scripts/ci-install-rocm.sh` (AMD apt pin, `libxml2` for ROCm `lld`, HIP/ML SDKs, and a hipcc smoke compile).
-- **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `vllm`, `mslk`) use `runs-on-long` (default `self-hosted,linux,cpu`; arch label `X64`/`ARM64` is appended from the matrix) inside `container-image` (default `ubuntu:22.04`). Short jobs use GitHub-hosted `ubuntu-22.04` / `ubuntu-22.04-arm`. CUDA still builds x86_64 and aarch64 in parallel; aarch64 long jobs stay on `ubuntu-22.04-arm` until a self-hosted `ARM64` runner exists (then point that matrix leg at `runs-on-long` + `ARM64`). ROCm is x86_64-only. Bootstrap via `scripts/ci-bootstrap-container.sh`. Long jobs set `MAX_JOBS` from `max-jobs-long` (default `0` → `nproc`) plus matching `CMAKE_BUILD_PARALLEL_LEVEL` / `NVCC_THREADS`.
+- **Long vs short runners:** GitHub-hosted runners hard-cap at 6h, so packages that typically exceed that (`xformers`, `flash-attention`, `aiter`, `mori`, `vllm`, `mslk`) use `runs-on-long` (default `self-hosted,linux,cpu`; arch label `X64`/`ARM64` is appended from the matrix) inside `container-image` (default `ubuntu:22.04`). Short jobs use GitHub-hosted `ubuntu-22.04` / `ubuntu-22.04-arm`. CUDA still builds x86_64 and aarch64 in parallel; aarch64 long jobs stay on `ubuntu-22.04-arm` until a self-hosted `ARM64` runner exists (then point that matrix leg at `runs-on-long` + `ARM64`). ROCm is x86_64-only. Bootstrap via `scripts/ci-bootstrap-container.sh`. Long jobs set `MAX_JOBS` from `max-jobs-long` (default `0` → `nproc`) plus matching `CMAKE_BUILD_PARALLEL_LEVEL` / `NVCC_THREADS`.
 - **Build OS:** Ubuntu **22.04** (glibc compatibility). `scripts/ci-assert-build-os.sh` fails CI if the runner/container is not 22.04, or after Ubuntu 22.04 standard-support EOL (**2027-05-31**). Wired from container bootstrap and `common.sh` under `GITHUB_ACTIONS`.
 - **Container Python:** Long jobs install **uv** + CPython via `scripts/ci-bootstrap-container.sh` (`uv python install`, version from `PYTHON_VERSION` / workflow `python-version`). `actions/setup-python` is skipped in containers (`WHEELS_IN_CONTAINER=1`) because toolcache Pythons often need a newer glibc than 22.04 provides.
 
