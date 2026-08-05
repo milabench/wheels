@@ -300,7 +300,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="gfx950",
         help="PYTORCH_ROCM_ARCH passed to CI (default: gfx950)",
     )
-    p.add_argument("--min-torch", default=None, help="Minimum torch version, e.g. 2.10")
+    p.add_argument("--min-torch", default="2.10", help="Minimum torch version, e.g. 2.10")
     p.add_argument("--max-torch", default=None, help="Maximum torch version, e.g. 2.12.1")
     p.add_argument("--min-rocm", default="7.0", help="Minimum ROCm index version (default: 7.0)")
     p.add_argument(
@@ -444,3 +444,7 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# python scripts/trigger-rocm-ci.py --override-previous --min-rocm 7.2 --trigger
+# python scripts/trigger-rocm-ci.py --override-previous --torch 2.10.0 --rocm 7.1
