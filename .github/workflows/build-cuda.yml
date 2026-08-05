@@ -122,6 +122,8 @@ jobs:
 
       - name: Bootstrap container
         if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
         run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
@@ -148,7 +150,7 @@ jobs:
           swap-size-gb: 16
 
       - name: Set up Python
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
@@ -444,6 +446,8 @@ jobs:
 
       - name: Bootstrap container
         if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
         run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
@@ -470,7 +474,7 @@ jobs:
           swap-size-gb: 16
 
       - name: Set up Python
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
@@ -599,6 +603,8 @@ jobs:
 
       - name: Bootstrap container
         if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
         run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
@@ -627,7 +633,7 @@ jobs:
           swap-size-gb: 16
 
       - name: Set up Python
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
@@ -711,6 +717,8 @@ jobs:
 
       - name: Bootstrap container
         if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
         run: bash scripts/ci-bootstrap-container.sh
 
       - name: Check if wheel already exists
@@ -739,7 +747,7 @@ jobs:
           swap-size-gb: 16
 
       - name: Set up Python
-        if: ${{ steps.check.outputs.skip != 'true' }}
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
