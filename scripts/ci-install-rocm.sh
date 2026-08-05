@@ -105,8 +105,10 @@ cat > "$SMOKE/smoke.hip" <<'EOF'
 #include <hip/hip_runtime.h>
 __global__ void k(int *x) { *x = 1; }
 EOF
-OFFLOAD_ARCH="${PYTORCH_ROCM_ARCH%%;*}"
-OFFLOAD_ARCH="${OFFLOAD_ARCH:-gfx90a}"
+# MI355X → gfx950 (matches workflow / trigger-rocm-ci defaults)
+OFFLOAD_ARCH="${PYTORCH_ROCM_ARCH:-gfx950}"
+OFFLOAD_ARCH="${OFFLOAD_ARCH%%;*}"
+OFFLOAD_ARCH="${OFFLOAD_ARCH:-gfx950}"
 hipcc --offload-arch="$OFFLOAD_ARCH" -c "$SMOKE/smoke.hip" -o "$SMOKE/smoke.o"
 rm -rf "$SMOKE"
 echo "==> hipcc smoke compile ok (--offload-arch=${OFFLOAD_ARCH})"
