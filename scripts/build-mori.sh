@@ -20,13 +20,17 @@ else
     SUDO="sudo"
 fi
 
-# Headers / libs required by MORI's CMake configure (not bundled in the wheel).
+# System deps from ROCm/mori docker/Dockerfile.dev (minus MPI — we build WITH_MPI=OFF).
 $SUDO apt-get update
 $SUDO apt-get install -y --no-install-recommends \
     libpci-dev \
     libibverbs-dev \
     ibverbs-utils \
-    libnuma-dev
+    libnuma-dev \
+    libgrpc-dev \
+    libgrpc++-dev \
+    libprotobuf-dev \
+    protobuf-compiler-grpc
 
 pip install \
     wheel \
