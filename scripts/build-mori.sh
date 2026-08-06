@@ -20,12 +20,13 @@ else
     SUDO="sudo"
 fi
 
-# Headers required by MORI's CMake configure (not bundled in the wheel).
+# Headers / libs required by MORI's CMake configure (not bundled in the wheel).
 $SUDO apt-get update
 $SUDO apt-get install -y --no-install-recommends \
     libpci-dev \
     libibverbs-dev \
-    ibverbs-utils
+    ibverbs-utils \
+    libnuma-dev
 
 pip install \
     wheel \
