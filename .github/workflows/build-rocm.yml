@@ -124,13 +124,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^xformers-" | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::xformers ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh xformers "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -233,14 +230,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          WHEEL_PREFIX=$(echo "${{ matrix.package }}" | sed 's/^pytorch_/torch_/')
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^${WHEEL_PREFIX}-" | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::${WHEEL_PREFIX} ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh "${{ matrix.package }}" "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -361,14 +354,11 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          VER="${{ matrix.torchao.version }}"
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep -E "^torchao-${VER}([+-]|$)" | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::torchao ${VER} ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+          TORCHAO_VERSION: ${{ matrix.torchao.version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh torchao "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -481,13 +471,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^flash_attn-" | grep -v "fa4" | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::flash-attention 2 ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh flash-attention "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -599,13 +586,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep -E '^(amd_aiter|aiter)-' | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::aiter ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh aiter "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -717,13 +701,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep -E '^amd_mori-' | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::mori ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh mori "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -825,13 +806,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # amdsmi is pure Python (py3-none-any); do not require $ARCH in the name.
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep -qE '^amdsmi-.*-py3-none-any\.whl$'; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::amdsmi (py3-none-any) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh amdsmi "${{ steps.rel.outputs.tag }}"
 
       - name: Set up Python
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -925,13 +903,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^vllm-" | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::vllm ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh vllm "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
@@ -1073,13 +1048,10 @@ jobs:
         if: ${{ inputs.upload-to-release && !inputs.override-previous }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ARCH=$(uname -m)
-          ASSETS=$(gh release view "${{ steps.rel.outputs.tag }}" --json assets -q '.assets[].name' 2>/dev/null || echo "")
-          if echo "$ASSETS" | grep "^mslk-" | grep -q "$ARCH"; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::mslk ($ARCH) wheel already exists in release ${{ steps.rel.outputs.tag }}, skipping build"
-          fi
+          GPU_BACKEND: rocm
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          ROCM_VERSION: ${{ matrix.rocm-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh mslk "${{ steps.rel.outputs.tag }}"
 
       - name: Free disk space
         if: ${{ steps.check.outputs.skip != 'true' }}
