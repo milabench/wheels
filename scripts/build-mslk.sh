@@ -10,6 +10,15 @@ export MAX_JOBS="${MAX_JOBS:-2}"
 export BUILD_FROM_NOVA=0
 export FORCE_CUDA=1
 
+# mslk_postbuild.bash resets RPATH with patchelf (not present on minimal containers).
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
+$SUDO apt-get update
+$SUDO apt-get install -y --no-install-recommends patchelf
+
 pip install wheel setuptools cmake ninja packaging scikit-build \
     "setuptools_git_versioning>=3.0.0" tabulate pyyaml jinja2 numpy
 
