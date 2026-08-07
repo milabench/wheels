@@ -122,9 +122,15 @@ case "$PACKAGE" in
 
     mslk)
         VER="${MSLK_VERSION#v}"
-        needle="mslk-${VER}+${ACCEL_SHORT}-"
+        # MSLK local version includes ROCm patch (e.g. +rocm7.2.26015), not +rocm7.2-
+        if [ "$GPU_BACKEND" = "rocm" ]; then
+            local_tag="rocm${ROCM_MAJOR}.${ROCM_MINOR}"
+        else
+            local_tag="${ACCEL_SHORT}"
+        fi
+        needle="mslk-${VER}+${local_tag}"
         if asset_has_arch "$needle"; then
-            emit_skip "mslk ${VER}+${ACCEL_SHORT} (${ARCH})"
+            emit_skip "mslk ${VER}+${local_tag} (${ARCH})"
         fi
         ;;
 

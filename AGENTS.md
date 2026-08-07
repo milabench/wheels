@@ -69,7 +69,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 | mori | `MORI_VERSION` | `v{VERSION}` (full tag) | `amd_mori-` | ROCm-only. Modular RDMA Interface from [ROCm/mori](https://github.com/ROCm/mori). Needs recursive submodules + `libpci-dev` / `libibverbs-dev`. Archs via `MORI_GPU_ARCHS` (default `gfx942;gfx950`, else `PYTORCH_ROCM_ARCH`). |
 | amdsmi | (none, from ROCm toolkit) | N/A | `amdsmi-` | ROCm-only. Python wrapper built from `/opt/rocm/share/amd_smi`. |
 | vllm | `VLLM_VERSION` | `v{VERSION}` | `vllm-` | CUDA + ROCm. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter (`amd_aiter`), mori (`amd_mori`), amdsmi. vLLM 0.26+ needs `setuptools-rust` and a prebuilt Rust frontend via upstream `build_rust.sh` (pinned protoc + Rust 1.95). |
-| mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmX.Y` local version. Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
+| mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmM.m.PATCH` local version (ROCm patch comes from the toolkit, e.g. `+rocm7.2.26015`). Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
 
 ## Key Env Vars in Build Scripts
 
