@@ -46,7 +46,9 @@ emit_skip() {
 case "$PACKAGE" in
     xformers)
         needle="xformers-${XFORMERS_VERSION}-"
-        asset_has_arch "$needle" && emit_skip "xformers ${XFORMERS_VERSION} (${ARCH})"
+        if asset_has_arch "$needle"; then
+            emit_skip "xformers ${XFORMERS_VERSION} (${ARCH})"
+        fi
         ;;
 
     pytorch_cluster|pytorch_sparse|pytorch_scatter)
@@ -56,7 +58,9 @@ case "$PACKAGE" in
             pytorch_scatter) VER="${PYTORCH_SCATTER_VERSION}"; PREFIX="torch_scatter" ;;
         esac
         needle="${PREFIX}-${VER}+${PT_VER}${ACCEL_SHORT}-"
-        asset_has_arch "$needle" && emit_skip "${PREFIX} ${VER}+${PT_VER}${ACCEL_SHORT} (${ARCH})"
+        if asset_has_arch "$needle"; then
+            emit_skip "${PREFIX} ${VER}+${PT_VER}${ACCEL_SHORT} (${ARCH})"
+        fi
         ;;
 
     torchao)
@@ -81,7 +85,9 @@ case "$PACKAGE" in
 
     flash-attention-4)
         VER="${FLASH_ATTN_4_TAG#fa4-v}"
-        asset_has "flash_attn_4-${VER}-" && emit_skip "flash-attention-4 ${VER} (py3-none-any)"
+        if asset_has "flash_attn_4-${VER}-"; then
+            emit_skip "flash-attention-4 ${VER} (py3-none-any)"
+        fi
         ;;
 
     aiter)
@@ -95,7 +101,9 @@ case "$PACKAGE" in
 
     mori)
         VER="${MORI_VERSION#v}"
-        asset_has_arch "amd_mori-${VER}-" && emit_skip "mori amd_mori-${VER} (${ARCH})"
+        if asset_has_arch "amd_mori-${VER}-"; then
+            emit_skip "mori amd_mori-${VER} (${ARCH})"
+        fi
         ;;
 
     amdsmi)
@@ -107,13 +115,17 @@ case "$PACKAGE" in
 
     vllm)
         needle="vllm-${VLLM_VERSION}+${ACCEL_SHORT}-"
-        asset_has_arch "$needle" && emit_skip "vllm ${VLLM_VERSION}+${ACCEL_SHORT} (${ARCH})"
+        if asset_has_arch "$needle"; then
+            emit_skip "vllm ${VLLM_VERSION}+${ACCEL_SHORT} (${ARCH})"
+        fi
         ;;
 
     mslk)
         VER="${MSLK_VERSION#v}"
         needle="mslk-${VER}+${ACCEL_SHORT}-"
-        asset_has_arch "$needle" && emit_skip "mslk ${VER}+${ACCEL_SHORT} (${ARCH})"
+        if asset_has_arch "$needle"; then
+            emit_skip "mslk ${VER}+${ACCEL_SHORT} (${ARCH})"
+        fi
         ;;
 
     *)
