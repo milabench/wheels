@@ -18,6 +18,7 @@ pip install \
     "packaging>=24.2" \
     "setuptools>=77.0.3,<81.0.0" \
     "setuptools-scm>=8" \
+    "setuptools-rust>=1.9.0" \
     wheel \
     "jinja2>=3.1.6" \
     regex \
@@ -81,6 +82,24 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
     fi
 
     reinstall_torch
+
+    # vLLM 0.26+ ships a Rust frontend; prebuild before pip wheel (upstream Docker flow).
+    if [ -f build_rust.sh ]; then
+        if [ "$(id -u)" -eq 0 ]; then
+            SUDO=""
+        else
+            SUDO="sudo"
+        fi
+        if ! command -v unzip >/dev/null 2>&1; then
+            echo "==> Installing unzip for protoc install"
+            $SUDO apt-get update
+            $SUDO apt-get install -y --no-install-recommends unzip
+        fi
+        echo "==> Installing pinned protoc for vLLM Rust build"
+        $SUDO bash tools/install_protoc.sh
+        echo "==> Prebuilding vLLM Rust frontend"
+        bash build_rust.sh
+    fi
 
     pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 )
