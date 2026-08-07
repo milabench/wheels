@@ -72,10 +72,11 @@ case "$PACKAGE" in
 
     flash-attention)
         VER="${FLASH_ATTN_VERSION}"
+        # flash-attn lowercases the local tag (cxx11abitrue, not cxx11abiTRUE).
         if [ "$GPU_BACKEND" = "rocm" ]; then
-            LOCAL="${ACCEL_SHORT}torch${TORCH_SHORT}cxx11abiTRUE"
+            LOCAL="${ACCEL_SHORT}torch${TORCH_SHORT}cxx11abitrue"
         else
-            LOCAL="cu${WHEEL_CUDA_VERSION}torch${TORCH_SHORT}cxx11abiTRUE"
+            LOCAL="cu${WHEEL_CUDA_VERSION}torch${TORCH_SHORT}cxx11abitrue"
         fi
         needle="flash_attn-${VER}+${LOCAL}-"
         if echo "$ASSETS" | grep -F "$needle" | grep -v "flash_attn_4" | grep -q "$ARCH"; then
