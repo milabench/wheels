@@ -91,6 +91,15 @@ case "$PACKAGE" in
         fi
         ;;
 
+    torchtitan)
+        # Version lives in the repo (assets/version.txt), not .env, and the pin
+        # is a git ref -- so treat any torchtitan py3-none-any wheel as present.
+        # Use --override-previous to force a rebuild when TORCHTITAN_REF moves.
+        if echo "$ASSETS" | grep -qE '^torchtitan-.*-py3-none-any\.whl$'; then
+            emit_skip "torchtitan (py3-none-any)"
+        fi
+        ;;
+
     aiter)
         VER="${AITER_VERSION#v}"
         if asset_has_arch "amd_aiter-${VER}-"; then
@@ -111,6 +120,13 @@ case "$PACKAGE" in
         # Version comes from the ROCm toolkit at build time; one wheel per release tag.
         if echo "$ASSETS" | grep -qE '^amdsmi-.*-py3-none-any\.whl$'; then
             emit_skip "amdsmi (py3-none-any)"
+        fi
+        ;;
+
+    atom)
+        VER="${ATOM_VERSION#v}"
+        if asset_has "atom-${VER}-py3-none-any.whl"; then
+            emit_skip "atom ${VER} (py3-none-any)"
         fi
         ;;
 

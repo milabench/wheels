@@ -559,6 +559,52 @@ jobs:
             fi
           }
 
+  build-torchtitan:
+    name: Build torchtitan
+    needs: [create-release]
+    if: ${{ always() && !cancelled() }}
+    timeout-minutes: 2160
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPU_BACKEND: cuda
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          CUDA_VERSION: ${{ inputs.cuda-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh torchtitan "${{ needs.create-release.outputs.tag }}"
+
+      - name: Build torchtitan
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-torchtitan.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" wheels/torchtitan-*.whl $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+            if grep -q "already exists" /tmp/upload.log; then
+              echo "::warning::Wheel already exists in release, skipping upload"
+            else
+              exit 1
+            fi
+          }
+
   build-vllm:
     needs: [create-release]
     if: ${{ always() && !cancelled() }}

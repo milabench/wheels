@@ -36,9 +36,9 @@ MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
 
 .PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
         torchao torchao-matrix flash-attention flash-attention-4 mslk \
-        aiter mori amdsmi vllm clean
+        torchtitan aiter mori amdsmi atom vllm clean
 
-all: xformers pyg torchao flash-attention flash-attention-4 mslk
+all: xformers pyg torchao flash-attention flash-attention-4 mslk torchtitan
 
 pyg: pytorch-cluster pytorch-sparse pytorch-scatter
 
@@ -93,6 +93,9 @@ flash-attention: $(VENV_SENTINEL)
 flash-attention-4: $(VENV_SENTINEL)
 	bash scripts/build-flash-attention-4.sh
 
+torchtitan: $(VENV_SENTINEL)
+	bash scripts/build-torchtitan.sh
+
 mslk: $(VENV_SENTINEL)
 	bash scripts/build-mslk.sh
 
@@ -104,6 +107,9 @@ mori: $(VENV_SENTINEL)
 
 amdsmi: $(VENV_SENTINEL)
 	bash scripts/build-amdsmi.sh
+
+atom: aiter
+	bash scripts/build-atom.sh
 
 ifeq ($(GPU_BACKEND),rocm)
 vllm: flash-attention aiter mori amdsmi
