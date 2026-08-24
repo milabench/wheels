@@ -31,7 +31,8 @@ $SUDO apt-get install -y --no-install-recommends \
     sudo \
     build-essential \
     xz-utils \
-    wget
+    wget \
+    software-properties-common
 
 # GitHub CLI (release upload / skip checks)
 if ! command -v gh >/dev/null 2>&1; then

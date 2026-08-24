@@ -518,7 +518,8 @@ jobs:
     needs: [create-release]
     if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
-    runs-on: ubuntu-latest
+    # Pinned to 22.04 (not ubuntu-latest → 24.04) for the build-OS assert / ABI.
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
@@ -564,7 +565,8 @@ jobs:
     needs: [create-release]
     if: ${{ always() && !cancelled() }}
     timeout-minutes: 2160
-    runs-on: ubuntu-latest
+    # Pinned to 22.04 (not ubuntu-latest → 24.04) for the build-OS assert / ABI.
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
