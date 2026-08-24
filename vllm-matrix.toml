@@ -13,6 +13,15 @@
 # ROCm resolves vLLM by a (torch, rocm) pair instead (platforms.toml
 # [vllm.rocm]); this table is CUDA-only.
 
+# Highest vLLM per torch minor is set by vLLM's own torch pin
+# (requirements/cuda.txt `torch==X.Y.Z`):
+#   2.10 -> 0.19.1 (only 0.19.1 pins torch 2.10)
+#   2.11 -> 0.20.2 .. 0.26.0 pin torch 2.11 (highest: 0.26.0)
+#   2.12 -> no vLLM release targets torch 2.12 (vLLM went 2.11 -> 2.13)
+#   2.13 -> 0.27.0 / 0.27.1 pin torch 2.13 (highest: 0.27.1)
+# torch 2.12 is intentionally omitted: there is no compatible vLLM, so it
+# falls back to VLLM_VERSION from .env (with a warning) if ever dispatched.
 [vllm]
 "2.10" = "0.19.1"
 "2.11" = "0.26.0"
+"2.13" = "0.27.1"
