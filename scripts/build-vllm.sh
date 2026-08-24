@@ -1,6 +1,17 @@
 #!/bin/bash
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/common.sh"
+
+# For CUDA the vLLM version is driven by the torch version: a newer vLLM cannot
+# compile against an older torch (stable-ABI mismatch), so resolve the highest
+# compatible vLLM from vllm-matrix.toml. ROCm keeps its (torch, rocm)-specific
+# pin from the environment/.env.
+if [ "$GPU_BACKEND" != "rocm" ]; then
+    VLLM_VERSION="$(python3 "${SCRIPT_DIR}/resolve-vllm-version.py" \
+        --torch "$PYTORCH_VERSION" --fallback "${VLLM_VERSION:-}")"
+    export VLLM_VERSION
+fi
 
 echo "==> Building vLLM ${VLLM_VERSION} (${ACCEL_SHORT})"
 

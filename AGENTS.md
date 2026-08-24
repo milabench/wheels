@@ -6,6 +6,8 @@ Builds GPU extension wheels for milabench. Each wheel is built from source again
 
 - `.env` — Single source of truth for package/infrastructure versions (except torchao CI matrix). Edit this to update versions.
 - `torchao-matrix.toml` — Maps PyTorch minor → list of torchao versions to build in CI. First entry is preferred; extras are optional older builds.
+- `vllm-matrix.toml` — Maps PyTorch minor → highest compatible vLLM version (CUDA). A newer vLLM will not compile against an older torch. Unmapped minors fall back to `VLLM_VERSION` from `.env`.
+- `scripts/resolve-vllm-version.py` — Reads `vllm-matrix.toml` for a torch version; used by `build-vllm.sh` and the CUDA skip check.
 - `scripts/common.sh` — Loads `.env`, detects `GPU_BACKEND` (cuda/rocm), computes derived vars (`ACCEL_SHORT`, `PT_VER`, etc.), creates `wheels/` dir.
 - `scripts/build-*.sh` — One script per package. Standalone: `bash scripts/build-xformers.sh`. Set `GPU_BACKEND=rocm` for ROCm builds.
 - `scripts/resolve-torchao-versions.py` — Reads `torchao-matrix.toml` for a torch version; used by CI and `make torchao-matrix`.
@@ -36,6 +38,8 @@ Build scripts use `ACCEL_SHORT` for version suffixes, making them backend-agnost
 2. Done. Scripts, Makefile, and CI all read from `.env`.
 
 **torchao (CI):** edit `torchao-matrix.toml` instead — add/remove versions under the torch minor key. First entry is preferred (hard fail); extras are optional (`continue-on-error`). Local `make torchao` still uses `TORCHAO_VERSION` from `.env`; `make torchao-matrix` builds the full list for `PYTORCH_VERSION`.
+
+**vllm (CUDA):** edit `vllm-matrix.toml` — set the torch minor → highest compatible vLLM version. `build-vllm.sh` and the CUDA skip check resolve `VLLM_VERSION` from `PYTORCH_VERSION`; unmapped minors fall back to `VLLM_VERSION` in `.env`. ROCm still uses the `(torch, rocm)` pin from the environment/`.env`.
 
 CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow inputs with defaults matching `.env`.
 
@@ -70,7 +74,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 | mori | `MORI_VERSION` | `v{VERSION}` (full tag) | `amd_mori-` | ROCm-only. Modular RDMA Interface from [ROCm/mori](https://github.com/ROCm/mori). Needs recursive submodules + `libpci-dev` / `libibverbs-dev`. Archs via `MORI_GPU_ARCHS` (default `gfx942;gfx950`, else `PYTORCH_ROCM_ARCH`). |
 | amdsmi | (none, from ROCm toolkit) | N/A | `amdsmi-` | ROCm-only. Python wrapper built from `/opt/rocm/share/amd_smi`. |
 | atom | `ATOM_VERSION` | `v{VERSION}` | `atom-` | ROCm-only. [ROCm/ATOM](https://github.com/ROCm/ATOM) inference server for milabench `serving-*` benchmarks. Pure Python wheel (`py3-none-any`); runtime needs `amd_aiter` (and often `amd_mori` for MoE EP). Build after `aiter`. `ATOM_MESH_BUILD=0` by default (optional Rust mesh). |
-| vllm | `VLLM_VERSION` | `v{VERSION}` | `vllm-` | CUDA + ROCm. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter (`amd_aiter`), mori (`amd_mori`), amdsmi. vLLM 0.26+ needs `setuptools-rust` and a prebuilt Rust frontend via upstream `build_rust.sh` (pinned protoc + Rust 1.95). |
+| vllm | `VLLM_VERSION` (rocm/fallback) / `vllm-matrix.toml` (cuda) | `v{VERSION}` | `vllm-` | CUDA + ROCm. **CUDA version is resolved from the torch version** via `vllm-matrix.toml` (highest compatible build; unmapped minors fall back to `.env`) because a newer vLLM won't compile against an older torch (e.g. 0.26 targets the torch 2.11 stable ABI and fails on 2.10). ROCm keeps its `(torch, rocm)` pin from the environment/`.env`. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter (`amd_aiter`), mori (`amd_mori`), amdsmi. vLLM 0.26+ needs `setuptools-rust` and a prebuilt Rust frontend via upstream `build_rust.sh` (pinned protoc + Rust 1.95). |
 | mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmM.m.PATCH` local version (ROCm patch comes from the toolkit, e.g. `+rocm7.2.26015`). Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
 
 ## Key Env Vars in Build Scripts

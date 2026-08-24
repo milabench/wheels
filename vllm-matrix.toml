@@ -1,0 +1,18 @@
+# Highest compatible vLLM version to build per PyTorch minor (CUDA).
+#
+# vLLM pins itself to a specific PyTorch through its stable-ABI C++ sources, so
+# a newer vLLM will not compile against an older torch. For example vLLM 0.26
+# builds `_C_stable_libtorch` against the torch 2.11 stable ABI
+# (TORCH_TARGET_VERSION=0x020B..., torch::stable::Tensor::layout(), the new
+# from_blob deleter signature) and therefore fails to compile against torch
+# 2.10. Pick the newest vLLM that compiles against each torch minor.
+#
+# Mirrors milabench platforms.toml [vllm.cuda]. When a torch minor is missing
+# here, build-vllm.sh / the skip check fall back to VLLM_VERSION from .env.
+#
+# ROCm resolves vLLM by a (torch, rocm) pair instead (platforms.toml
+# [vllm.rocm]); this table is CUDA-only.
+
+[vllm]
+"2.10" = "0.19.1"
+"2.11" = "0.26.0"

@@ -131,9 +131,16 @@ case "$PACKAGE" in
         ;;
 
     vllm)
-        needle="vllm-${VLLM_VERSION}+${ACCEL_SHORT}-"
+        # CUDA resolves the vLLM version from torch (highest compatible build);
+        # ROCm keeps its (torch, rocm)-specific pin from the environment/.env.
+        VER="${VLLM_VERSION}"
+        if [ "$GPU_BACKEND" != "rocm" ]; then
+            VER="$(python3 "${SCRIPT_DIR}/resolve-vllm-version.py" \
+                --torch "$PYTORCH_VERSION" --fallback "${VLLM_VERSION:-}")"
+        fi
+        needle="vllm-${VER}+${ACCEL_SHORT}-"
         if asset_has_arch "$needle"; then
-            emit_skip "vllm ${VLLM_VERSION}+${ACCEL_SHORT} (${ARCH})"
+            emit_skip "vllm ${VER}+${ACCEL_SHORT} (${ARCH})"
         fi
         ;;
 
