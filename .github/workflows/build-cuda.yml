@@ -104,12 +104,10 @@ jobs:
       matrix:
         include:
           # Arch label is implicit from the matrix leg (not an input).
-          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
-          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-22.04-arm
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'ARM64')) }}
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
@@ -418,12 +416,10 @@ jobs:
       matrix:
         include:
           # Arch label is implicit from the matrix leg (not an input).
-          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
-          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-22.04-arm
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'ARM64')) }}
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
@@ -618,12 +614,10 @@ jobs:
       matrix:
         include:
           # Arch label is implicit from the matrix leg (not an input).
-          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
-          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-22.04-arm
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'ARM64')) }}
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
@@ -729,12 +723,10 @@ jobs:
       matrix:
         include:
           # Arch label is implicit from the matrix leg (not an input).
-          # aarch64 stays on GitHub-hosted until a self-hosted ARM64 runner exists;
-          # then switch that leg to the same runs-on-long + ARM64 expression as x86_64.
           - arch: x86_64
             runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
           - arch: aarch64
-            runner: ubuntu-22.04-arm
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'ARM64')) }}
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ inputs.container-image }}
