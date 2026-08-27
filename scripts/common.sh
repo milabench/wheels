@@ -61,6 +61,18 @@ if [ "$GPU_BACKEND" = "rocm" ]; then
     if [ -z "${CMAKE_HIP_ARCHITECTURES:-}" ] && [ -n "${PYTORCH_ROCM_ARCH:-}" ]; then
         export CMAKE_HIP_ARCHITECTURES="${PYTORCH_ROCM_ARCH}"
     fi
+elif [ "$GPU_BACKEND" = "xpu" ]; then
+    export ACCEL_SHORT="xpu"
+    # Source oneAPI environment (provides icx/icpx DPC++ compiler, oneMKL, etc.)
+    # --force allows re-sourcing in subshells without errors.
+    ONEAPI_SETVARS="${ONEAPI_ROOT:-/opt/intel/oneapi}/setvars.sh"
+    if [ -f "$ONEAPI_SETVARS" ]; then
+        source "$ONEAPI_SETVARS" --force >/dev/null 2>&1 || true
+    fi
+    # Optional AOT SYCL compilation targets (e.g. "pvc" for Data Center GPU Max,
+    # "acm-g10" for Arc A770). Without this, SYCL JIT-compiles at first run on any Intel GPU.
+    export XPU_AOT_DEVLIST="${XPU_AOT_DEVLIST:-}"
+    export USE_AOT_DEVLIST="${XPU_AOT_DEVLIST}"
 else
     CUDA_MAJOR="${CUDA_VERSION%%.*}"
     _rest="${CUDA_VERSION#*.}"

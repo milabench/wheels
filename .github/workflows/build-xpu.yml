@@ -1,0 +1,206 @@
+name: Build XPU Wheels
+
+
+on:
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: "Python version (vLLM XPU requires 3.12)"
+        required: true
+        type: string
+        default: "3.12"
+      oneapi-version:
+        description: "Intel oneAPI Toolkit version (e.g., 2026.1)"
+        required: true
+        type: string
+        default: "2026.1"
+      torch-version:
+        description: "PyTorch version (e.g., 2.12.0)"
+        required: true
+        type: string
+        default: "2.12.0"
+      xpu-aot-devlist:
+        description: "SYCL AOT compilation targets (comma-separated; empty = JIT on any Intel GPU)"
+        required: false
+        type: string
+        default: "pvc"
+
+      runs-on-long:
+        description: "Base labels for long (>6h) self-hosted builds; X64 is appended (XPU is x86_64-only)"
+        required: true
+        type: string
+        default: '["self-hosted","linux","cpu"]'
+      container-image:
+        description: "Container image for long builds (isolates apt/pip from the host)"
+        required: true
+        type: string
+        default: "ubuntu:22.04"
+      max-jobs-long:
+        description: "Compile parallelism for long/self-hosted builds (0 = nproc)"
+        required: true
+        type: string
+        default: "0"
+
+      upload-to-release:
+        description: "Upload built wheels to a GitHub release"
+        type: boolean
+        default: true
+      override-previous:
+        description: "Override existing release assets with the same name"
+        type: boolean
+        default: false
+      release-tag:
+        description: "Release tag (leave empty for auto: torch{X.Y}-xpu)"
+        type: string
+        default: ""
+
+defaults:
+  run:
+    shell: bash -x -e -u -o pipefail {0}
+
+jobs:
+  create-release:
+    name: Create release
+    if: ${{ inputs.upload-to-release }}
+    timeout-minutes: 2160
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compute release tag
+        id: tag
+        run: |
+          TAG="${{ inputs.release-tag }}"
+          if [ -z "$TAG" ]; then
+            TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+            TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+            TAG="torch${TORCH_MAJOR}.${TORCH_MINOR}-xpu"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create release (if it does not exist)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes "XPU wheels for PyTorch ${{ inputs.torch-version }} + oneAPI ${{ inputs.oneapi-version }}" \
+            2>/dev/null || true
+
+  build-vllm:
+    needs: [create-release]
+    if: ${{ always() && !cancelled() }}
+    timeout-minutes: 2160
+    permissions:
+      contents: write
+    runs-on: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
+      XPU_AOT_DEVLIST: ${{ inputs.xpu-aot-devlist }}
+    name: Build vllm (XPU)
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
+        run: bash scripts/ci-bootstrap-container.sh
+
+      - name: Compute release tag
+        id: rel
+        run: |
+          TAG="${{ inputs.release-tag }}"
+          if [ -z "$TAG" ]; then
+            TORCH_MAJOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f1)
+            TORCH_MINOR=$(echo "${{ inputs.torch-version }}" | cut -d. -f2)
+            TAG="torch${TORCH_MAJOR}.${TORCH_MINOR}-xpu"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPU_BACKEND: xpu
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh vllm "${{ steps.rel.outputs.tag }}"
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "GPU_BACKEND=xpu" >> $GITHUB_ENV
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "ONEAPI_VERSION=${{ inputs.oneapi-version }}" >> $GITHUB_ENV
+          echo "XPU_AOT_DEVLIST=${{ inputs.xpu-aot-devlist }}" >> $GITHUB_ENV
+
+      - name: Install oneAPI ${{ inputs.oneapi-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/ci-install-oneapi.sh "${{ inputs.oneapi-version }}"
+
+      - name: Install PyTorch (XPU)
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir numpy
+          pip install --no-cache-dir \
+            torch==${{ inputs.torch-version }} \
+            torchvision torchaudio \
+            --index-url https://download.pytorch.org/whl/xpu
+
+      - name: Build vllm
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-vllm.sh
+
+      - name: Save wheel artifact
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: vllm-xpu-x86_64
+          path: wheels/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          for whl in wheels/vllm-*.whl; do
+            [ -f "$whl" ] || continue
+            gh release upload -R "$GITHUB_REPOSITORY" "${{ steps.rel.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+              if grep -q "already exists" /tmp/upload.log; then
+                echo "::warning::Wheel already exists in release, skipping upload"
+              else
+                exit 1
+              fi
+            }
+          done

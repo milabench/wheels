@@ -132,9 +132,9 @@ case "$PACKAGE" in
 
     vllm)
         # CUDA resolves the vLLM version from torch (highest compatible build);
-        # ROCm keeps its (torch, rocm)-specific pin from the environment/.env.
+        # ROCm and XPU keep their backend-specific pin from the environment/.env.
         VER="${VLLM_VERSION}"
-        if [ "$GPU_BACKEND" != "rocm" ]; then
+        if [ "$GPU_BACKEND" = "cuda" ]; then
             VER="$(python3 "${SCRIPT_DIR}/resolve-vllm-version.py" \
                 --torch "$PYTORCH_VERSION" --fallback "${VLLM_VERSION:-}")"
         fi

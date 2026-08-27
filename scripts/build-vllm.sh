@@ -5,9 +5,9 @@ source "${SCRIPT_DIR}/common.sh"
 
 # For CUDA the vLLM version is driven by the torch version: a newer vLLM cannot
 # compile against an older torch (stable-ABI mismatch), so resolve the highest
-# compatible vLLM from vllm-matrix.toml. ROCm keeps its (torch, rocm)-specific
-# pin from the environment/.env.
-if [ "$GPU_BACKEND" != "rocm" ]; then
+# compatible vLLM from vllm-matrix.toml. ROCm and XPU keep their backend-specific
+# pins from the environment/.env.
+if [ "$GPU_BACKEND" = "cuda" ]; then
     VLLM_VERSION="$(python3 "${SCRIPT_DIR}/resolve-vllm-version.py" \
         --torch "$PYTORCH_VERSION" --fallback "${VLLM_VERSION:-}")"
     export VLLM_VERSION
@@ -58,7 +58,19 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
 (
     cd vllm
 
-    if [ "$GPU_BACKEND" = "rocm" ]; then
+    if [ "$GPU_BACKEND" = "xpu" ]; then
+        export VLLM_TARGET_DEVICE=xpu
+        # triton-xpu is the Intel GPU backend for Triton; it replaces NVIDIA triton on XPU.
+        # Install before building so vLLM's setup.py can detect it.
+        pip uninstall -y triton 2>/dev/null || true
+        pip install --no-cache-dir triton-xpu \
+            --extra-index-url https://download.pytorch.org/whl/xpu
+
+        # Optional: AOT-compile SYCL kernels for the target device list.
+        if [ -n "${XPU_AOT_DEVLIST:-}" ]; then
+            export USE_AOT_DEVLIST="${XPU_AOT_DEVLIST}"
+        fi
+    elif [ "$GPU_BACKEND" = "rocm" ]; then
         export VLLM_TARGET_DEVICE=rocm
         # Do not set FORCE_CUDA on ROCm — it is a CUDA-extension escape hatch.
 

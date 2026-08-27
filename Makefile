@@ -20,6 +20,8 @@ WHEELS_DIR       ?= $(CURDIR)/wheels
 
 ifeq ($(GPU_BACKEND),rocm)
   ACCEL_SHORT := $(ROCM_SHORT)
+else ifeq ($(GPU_BACKEND),xpu)
+  ACCEL_SHORT := xpu
 else
   ACCEL_SHORT := $(CUDA_SHORT)
 endif
@@ -116,6 +118,7 @@ vllm: flash-attention aiter mori amdsmi
 else
 vllm: $(VENV_SENTINEL)
 endif
+# XPU: only vllm needs source compilation; all other packages come from download.pytorch.org/whl/xpu
 	bash scripts/build-vllm.sh
 
 clean:

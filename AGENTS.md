@@ -1,6 +1,6 @@
 # Wheels Build System
 
-Builds GPU extension wheels for milabench. Each wheel is built from source against a specific PyTorch + CUDA or ROCm version.
+Builds GPU extension wheels for milabench. Each wheel is built from source against a specific PyTorch + CUDA, ROCm, or XPU (Intel oneAPI) version.
 
 ## File Layout
 
@@ -8,29 +8,32 @@ Builds GPU extension wheels for milabench. Each wheel is built from source again
 - `torchao-matrix.toml` — Maps PyTorch minor → list of torchao versions to build in CI. First entry is preferred; extras are optional older builds.
 - `vllm-matrix.toml` — Maps PyTorch minor → highest compatible vLLM version (CUDA). A newer vLLM will not compile against an older torch. Unmapped minors fall back to `VLLM_VERSION` from `.env`.
 - `scripts/resolve-vllm-version.py` — Reads `vllm-matrix.toml` for a torch version; used by `build-vllm.sh` and the CUDA skip check.
-- `scripts/common.sh` — Loads `.env`, detects `GPU_BACKEND` (cuda/rocm), computes derived vars (`ACCEL_SHORT`, `PT_VER`, etc.), creates `wheels/` dir.
-- `scripts/build-*.sh` — One script per package. Standalone: `bash scripts/build-xformers.sh`. Set `GPU_BACKEND=rocm` for ROCm builds.
+- `scripts/common.sh` — Loads `.env`, detects `GPU_BACKEND` (cuda/rocm/xpu), computes derived vars (`ACCEL_SHORT`, `PT_VER`, etc.), creates `wheels/` dir.
+- `scripts/build-*.sh` — One script per package. Standalone: `bash scripts/build-xformers.sh`. Set `GPU_BACKEND=rocm` for ROCm or `GPU_BACKEND=xpu` for Intel XPU builds.
 - `scripts/resolve-torchao-versions.py` — Reads `torchao-matrix.toml` for a torch version; used by CI and `make torchao-matrix`.
-- `Makefile` — Runs scripts with `.env` exported. `make all` builds everything, `make GPU_BACKEND=rocm <target>` builds for ROCm.
+- `Makefile` — Runs scripts with `.env` exported. `make all` builds everything, `make GPU_BACKEND=rocm <target>` builds for ROCm, `make GPU_BACKEND=xpu vllm` builds for XPU.
 - `.github/workflows/build-cuda.yml` — CUDA CI workflow. Builds all wheels in parallel (x86_64 + aarch64), uploads to a GitHub release.
 - `.github/workflows/build-rocm.yml` — ROCm CI workflow. Builds GPU wheels for ROCm (x86_64 only), uploads to a separate release.
+- `.github/workflows/build-xpu.yml` — XPU (Intel GPU) CI workflow. Builds vLLM for XPU (x86_64 only), uploads to a separate release.
+- `scripts/ci-install-oneapi.sh` — Install Intel oneAPI toolkit (DPC++ compiler + oneMKL) from Intel's apt repo. Used by `build-xpu.yml`.
 - `scripts/trigger-rocm-ci.py` — Discover torch+ROCm combos on the official PyTorch index and dispatch `build-rocm.yml` (dry-run by default; `--trigger` to run).
 - `scripts/trigger-cuda-ci.py` — Same for CUDA / `build-cuda.yml` (`cu130` ↔ toolkit `13.0.0`).
 - `scripts/ci-assert-build-os.sh` — Fail CI if not Ubuntu 22.04, or after 22.04 standard-support EOL (2027-05-31).
 
 ## GPU Backend
 
-Set `GPU_BACKEND` to switch between CUDA and ROCm:
+Set `GPU_BACKEND` to switch between CUDA, ROCm, and XPU:
 
-| Variable | CUDA (default) | ROCm |
-|---|---|---|
-| `GPU_BACKEND` | `cuda` | `rocm` |
-| `ACCEL_SHORT` | `cu130` | `rocm7.0` |
-| PyTorch index | `whl/cu130` | `whl/rocm7.0` |
-| Release tag | `torch2.10-cu130` | `torch2.10-rocm7.0` |
-| Arch list env | `TORCH_CUDA_ARCH_LIST` | `PYTORCH_ROCM_ARCH` |
+| Variable | CUDA (default) | ROCm | XPU (Intel) |
+|---|---|---|---|
+| `GPU_BACKEND` | `cuda` | `rocm` | `xpu` |
+| `ACCEL_SHORT` | `cu130` | `rocm7.0` | `xpu` |
+| PyTorch index | `whl/cu130` | `whl/rocm7.0` | `whl/xpu` |
+| Release tag | `torch2.10-cu130` | `torch2.10-rocm7.0` | `torch2.12-xpu` |
+| Arch list env | `TORCH_CUDA_ARCH_LIST` | `PYTORCH_ROCM_ARCH` | `XPU_AOT_DEVLIST` |
+| Toolkit installer | (bundled with runner) | `ci-install-rocm.sh` | `ci-install-oneapi.sh` |
 
-Build scripts use `ACCEL_SHORT` for version suffixes, making them backend-agnostic. `FORCE_CUDA=1` works for both backends (ROCm's HIP layer emulates CUDA APIs).
+Build scripts use `ACCEL_SHORT` for version suffixes, making them backend-agnostic. `FORCE_CUDA=1` works for both CUDA and ROCm backends (ROCm's HIP layer emulates CUDA APIs). **Do not set `FORCE_CUDA` for XPU** — the Intel DPC++ path is selected via `VLLM_TARGET_DEVICE=xpu` and oneAPI environment variables.
 
 ## How to Update a Version
 
@@ -74,7 +77,7 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 | mori | `MORI_VERSION` | `v{VERSION}` (full tag) | `amd_mori-` | ROCm-only. Modular RDMA Interface from [ROCm/mori](https://github.com/ROCm/mori). Needs recursive submodules + `libpci-dev` / `libibverbs-dev`. Archs via `MORI_GPU_ARCHS` (default `gfx942;gfx950`, else `PYTORCH_ROCM_ARCH`). |
 | amdsmi | (none, from ROCm toolkit) | N/A | `amdsmi-` | ROCm-only. Python wrapper built from `/opt/rocm/share/amd_smi`. |
 | atom | `ATOM_VERSION` | `v{VERSION}` | `atom-` | ROCm-only. [ROCm/ATOM](https://github.com/ROCm/ATOM) inference server for milabench `serving-*` benchmarks. Pure Python wheel (`py3-none-any`); runtime needs `amd_aiter` (and often `amd_mori` for MoE EP). Build after `aiter`. `ATOM_MESH_BUILD=0` by default (optional Rust mesh). |
-| vllm | `VLLM_VERSION` (rocm/fallback) / `vllm-matrix.toml` (cuda) | `v{VERSION}` | `vllm-` | CUDA + ROCm. **CUDA version is resolved from the torch version** via `vllm-matrix.toml` (highest compatible build; unmapped minors fall back to `.env`) because a newer vLLM won't compile against an older torch (e.g. 0.26 targets the torch 2.11 stable ABI and fails on 2.10). ROCm keeps its `(torch, rocm)` pin from the environment/`.env`. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm tag is explicit (upstream omits `+cuXXX` when it matches `VLLM_MAIN_CUDA_VERSION`). ROCm builds also depend on flash-attn, aiter (`amd_aiter`), mori (`amd_mori`), amdsmi. vLLM 0.26+ needs `setuptools-rust` and a prebuilt Rust frontend via upstream `build_rust.sh` (pinned protoc + Rust 1.95). |
+| vllm | `VLLM_VERSION` (rocm/xpu/fallback) / `vllm-matrix.toml` (cuda) | `v{VERSION}` | `vllm-` | CUDA + ROCm + XPU. **CUDA version is resolved from the torch version** via `vllm-matrix.toml` (highest compatible build; unmapped minors fall back to `.env`) because a newer vLLM won't compile against an older torch (e.g. 0.26 targets the torch 2.11 stable ABI and fails on 2.10). ROCm and XPU keep their backend-specific pin from the environment/`.env`. Wheel version forced to `{VERSION}+{ACCEL_SHORT}` via `VLLM_VERSION_OVERRIDE` so the CUDA/ROCm/XPU tag is explicit. ROCm builds depend on flash-attn, aiter, mori, amdsmi. **XPU builds** use `VLLM_TARGET_DEVICE=xpu`, require Intel oneAPI toolkit (DPC++ + oneMKL), and install `triton-xpu` in place of NVIDIA triton. Optional AOT compilation via `XPU_AOT_DEVLIST` (e.g. `pvc` for Data Center GPU Max). vLLM 0.26+ needs `setuptools-rust` and a prebuilt Rust frontend via upstream `build_rust.sh`. |
 | mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmM.m.PATCH` local version (ROCm patch comes from the toolkit, e.g. `+rocm7.2.26015`). Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
 
 ## Key Env Vars in Build Scripts
@@ -89,6 +92,9 @@ CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow input
 - `TORCH_CUDA_ARCH_LIST` — Semicolon-separated NVIDIA GPU architectures (CUDA builds).
 - `PYTORCH_ROCM_ARCH` — Semicolon-separated AMD GPU architectures (ROCm builds, e.g., `gfx90a;gfx942`).
 - `MORI_GPU_ARCHS` — Semicolon-separated AMD GPU architectures for MORI (defaults to `PYTORCH_ROCM_ARCH` if unset).
+- `ONEAPI_ROOT` — Intel oneAPI install root (default `/opt/intel/oneapi`). `common.sh` sources `$ONEAPI_ROOT/setvars.sh` when `GPU_BACKEND=xpu`.
+- `ONEAPI_VERSION` — Intel oneAPI Toolkit version used by `ci-install-oneapi.sh` (e.g., `2026.1`). XPU builds only.
+- `XPU_AOT_DEVLIST` / `USE_AOT_DEVLIST` — Comma-separated SYCL AOT compilation targets (e.g., `pvc` for Data Center GPU Max, `acm-g10` for Arc A770). Empty = SPIR-V JIT at runtime on any Intel GPU. XPU builds only.
 
 ## CI Behavior
 
