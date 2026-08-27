@@ -63,11 +63,19 @@ if [ "$GPU_BACKEND" = "rocm" ]; then
     fi
 elif [ "$GPU_BACKEND" = "xpu" ]; then
     export ACCEL_SHORT="xpu"
-    # Source oneAPI environment (provides icx/icpx DPC++ compiler, oneMKL, etc.)
-    # --force allows re-sourcing in subshells without errors.
-    ONEAPI_SETVARS="${ONEAPI_ROOT:-/opt/intel/oneapi}/setvars.sh"
-    if [ -f "$ONEAPI_SETVARS" ]; then
-        source "$ONEAPI_SETVARS" --force >/dev/null 2>&1 || true
+    # Source oneAPI environment only if not already initialized.
+    # ci-install-oneapi.sh exports ONEAPI_SETVARS_COMPLETED=1 via GITHUB_ENV when done,
+    # so CI build steps skip this. For local builds it runs once on first source.
+    # set +eu guard: setvars.sh references vars that may be unset, and with set -u
+    # active in the parent shell the unbound-variable error would propagate through
+    # `source` and exit the parent before `|| true` has a chance to catch it.
+    if [ -z "${ONEAPI_SETVARS_COMPLETED:-}" ]; then
+        ONEAPI_SETVARS="${ONEAPI_ROOT:-/opt/intel/oneapi}/setvars.sh"
+        if [ -f "$ONEAPI_SETVARS" ]; then
+            set +eu
+            source "$ONEAPI_SETVARS" --force 2>/dev/null || true
+            set -eu
+        fi
     fi
     # Optional AOT SYCL compilation targets (e.g. "pvc" for Data Center GPU Max,
     # "acm-g10" for Arc A770). Without this, SYCL JIT-compiles at first run on any Intel GPU.

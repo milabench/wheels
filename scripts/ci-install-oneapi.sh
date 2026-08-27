@@ -66,6 +66,10 @@ if [ -n "${GITHUB_ENV:-}" ]; then
         echo "DPCPPROOT=${DPCPPROOT:-}"
         echo "MKLROOT=${MKLROOT:-}"
         echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}"
+        # Signal to common.sh that setvars.sh has already been sourced so
+        # build scripts skip the second sourcing (which can exit the parent shell
+        # when set -u is active and setvars.sh references unset variables).
+        echo "ONEAPI_SETVARS_COMPLETED=1"
     } >> "$GITHUB_ENV"
 fi
 
