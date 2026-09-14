@@ -206,7 +206,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [pytorch_cluster, pytorch_sparse, pytorch_scatter]
+        package: [pytorch_cluster, pytorch_sparse, pytorch_scatter, pyg_lib]
         arch: [x86_64, aarch64]
         include:
           - arch: x86_64

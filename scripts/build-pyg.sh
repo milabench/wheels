@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-PACKAGE="${1:?Usage: $0 <pytorch_cluster|pytorch_sparse|pytorch_scatter>}"
+PACKAGE="${1:?Usage: $0 <pytorch_cluster|pytorch_sparse|pytorch_scatter|pyg_lib>}"
 
 case "$PACKAGE" in
     pytorch_cluster)
@@ -17,6 +17,11 @@ case "$PACKAGE" in
         VERSION="${PYTORCH_SCATTER_VERSION}"
         REPO="https://github.com/rusty1s/pytorch_scatter.git"
         ;;
+    pyg_lib)
+        # No ROCm support upstream (CMakeLists has no HIP path) -- CUDA only.
+        VERSION="${PYG_LIB_VERSION}"
+        REPO="https://github.com/pyg-team/pyg-lib.git"
+        ;;
     *)
         echo "Unknown package: $PACKAGE" >&2
         exit 1
@@ -29,7 +34,9 @@ export MAX_JOBS="${MAX_JOBS:-2}"
 
 pip install wheel setuptools cmake ninja packaging
 
-git clone --recurse-submodules --branch "$VERSION" --depth 1 "$REPO"
+# Repo name (pyg-lib) differs from the package/import name (pyg_lib); clone
+# into an explicit dir so it matches PACKAGE for the rest of the script.
+git clone --recurse-submodules --shallow-submodules --branch "$VERSION" --depth 1 "$REPO" "$PACKAGE"
 (
     cd "$PACKAGE"
     sed -i "s/__version__ = '${VERSION}'/__version__ = '${VERSION}+${PT_VER}${ACCEL_SHORT}'/" setup.py

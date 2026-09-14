@@ -51,11 +51,12 @@ case "$PACKAGE" in
         fi
         ;;
 
-    pytorch_cluster|pytorch_sparse|pytorch_scatter)
+    pytorch_cluster|pytorch_sparse|pytorch_scatter|pyg_lib)
         case "$PACKAGE" in
             pytorch_cluster) VER="${PYTORCH_CLUSTER_VERSION}"; PREFIX="torch_cluster" ;;
             pytorch_sparse)  VER="${PYTORCH_SPARSE_VERSION}";  PREFIX="torch_sparse" ;;
             pytorch_scatter) VER="${PYTORCH_SCATTER_VERSION}"; PREFIX="torch_scatter" ;;
+            pyg_lib)         VER="${PYG_LIB_VERSION}";         PREFIX="pyg_lib" ;;
         esac
         needle="${PREFIX}-${VER}+${PT_VER}${ACCEL_SHORT}-"
         if asset_has_arch "$needle"; then

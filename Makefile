@@ -36,13 +36,13 @@ export PATH := $(CURDIR)/$(VENV_DIR)/bin:$(PATH)
 MATRIX_PYTORCH_VERSIONS ?= 2.10.0 2.11.0 2.12.0
 MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
 
-.PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter \
+.PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter pyg-lib \
         torchao torchao-matrix flash-attention flash-attention-4 mslk \
         torchtitan aiter mori amdsmi atom vllm clean
 
 all: xformers pyg torchao flash-attention flash-attention-4 mslk torchtitan
 
-pyg: pytorch-cluster pytorch-sparse pytorch-scatter
+pyg: pytorch-cluster pytorch-sparse pytorch-scatter pyg-lib
 
 matrix:
 	@for pt in $(MATRIX_PYTORCH_VERSIONS); do \
@@ -78,6 +78,9 @@ pytorch-sparse: $(VENV_SENTINEL)
 
 pytorch-scatter: $(VENV_SENTINEL)
 	bash scripts/build-pyg.sh pytorch_scatter
+
+pyg-lib: $(VENV_SENTINEL)
+	bash scripts/build-pyg.sh pyg_lib
 
 torchao: $(VENV_SENTINEL)
 	bash scripts/build-torchao.sh
