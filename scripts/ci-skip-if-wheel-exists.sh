@@ -159,6 +159,14 @@ case "$PACKAGE" in
         fi
         ;;
 
+    transformer-engine)
+        VER="${TRANSFORMER_ENGINE_VERSION#v}"
+        needle="transformer_engine-${VER}-"
+        if asset_has_arch "$needle"; then
+            emit_skip "transformer-engine ${VER} (${ARCH})"
+        fi
+        ;;
+
     *)
         echo "::error::Unknown package for skip check: ${PACKAGE}" >&2
         exit 1
