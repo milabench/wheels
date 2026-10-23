@@ -49,6 +49,10 @@ on:
         description: "Override existing release assets with the same name"
         type: boolean
         default: false
+      packages:
+        description: "Comma-separated packages to build (empty = all): xformers,pyg,torchao,flash-attention,flash-attention-4,torchtitan,vllm,mslk,transformer-engine,torch-memory-saver"
+        type: string
+        default: ""
       release-tag:
         description: "Release tag (leave empty for auto: torch{X.Y}-cu{MAJMIN})"
         type: string
@@ -95,7 +99,7 @@ jobs:
 
   build-xformers:
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',xformers,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -199,7 +203,7 @@ jobs:
 
   build-pyg:
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',pyg,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -310,7 +314,7 @@ jobs:
 
   build-torchao:
     needs: [create-release, resolve-torchao]
-    if: ${{ always() && !cancelled() && needs.resolve-torchao.result == 'success' }}
+    if: ${{ always() && !cancelled() && needs.resolve-torchao.result == 'success' && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',torchao,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -407,7 +411,7 @@ jobs:
 
   build-flash-attention:
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',flash-attention,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -512,7 +516,7 @@ jobs:
   build-flash-attention-4:
     name: Build flash-attention-4
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',flash-attention-4,')) }}
     timeout-minutes: 2160
     # Pinned to 22.04 (not ubuntu-latest → 24.04) for the build-OS assert / ABI.
     runs-on: ubuntu-22.04
@@ -559,7 +563,7 @@ jobs:
   build-torchtitan:
     name: Build torchtitan
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',torchtitan,')) }}
     timeout-minutes: 2160
     # Pinned to 22.04 (not ubuntu-latest → 24.04) for the build-OS assert / ABI.
     runs-on: ubuntu-22.04
@@ -605,7 +609,7 @@ jobs:
 
   build-vllm:
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',vllm,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -714,7 +718,7 @@ jobs:
 
   build-mslk:
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',mslk,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -823,7 +827,7 @@ jobs:
 
   build-transformer-engine:
     needs: [create-release]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',transformer-engine,')) }}
     timeout-minutes: 2160
     permissions:
       contents: write
@@ -920,6 +924,115 @@ jobs:
             CLOBBER_FLAG="--clobber"
           fi
           for whl in wheels/transformer_engine-*.whl; do
+            [ -f "$whl" ] || continue
+            gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
+              if grep -q "already exists" /tmp/upload.log; then
+                echo "::warning::Wheel already exists in release, skipping upload"
+              else
+                exit 1
+              fi
+            }
+          done
+
+  build-torch-memory-saver:
+    needs: [create-release]
+    if: ${{ always() && !cancelled() && (inputs.packages == '' || contains(format(',{0},', inputs.packages), ',torch-memory-saver,')) }}
+    timeout-minutes: 2160
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Arch label is implicit from the matrix leg (not an input).
+          - arch: x86_64
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'X64')) }}
+          - arch: aarch64
+            runner: ${{ fromJSON(format('["{0}","{1}"]', join(fromJSON(inputs.runs-on-long), '","'), 'ARM64')) }}
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ inputs.max-jobs-long }}
+    name: Build torch-memory-saver (${{ matrix.arch }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        if: ${{ env.WHEELS_IN_CONTAINER == '1' }}
+        env:
+          PYTHON_VERSION: ${{ inputs.python-version }}
+        run: bash scripts/ci-bootstrap-container.sh
+
+      - name: Check if wheel already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPU_BACKEND: cuda
+          PYTORCH_VERSION: ${{ inputs.torch-version }}
+          CUDA_VERSION: ${{ inputs.cuda-version }}
+        run: bash scripts/ci-skip-if-wheel-exists.sh torch-memory-saver "${{ needs.create-release.outputs.tag }}"
+
+      - name: Free disk space
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/local/lib/android /usr/local/share/boost
+
+      - name: Set up swap space
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 16
+
+      - name: Set up Python
+        if: ${{ steps.check.outputs.skip != 'true' && env.WHEELS_IN_CONTAINER != '1' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set environment from inputs
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          echo "PYTORCH_VERSION=${{ inputs.torch-version }}" >> $GITHUB_ENV
+          echo "CUDA_VERSION=${{ inputs.cuda-version }}" >> $GITHUB_ENV
+          echo "TORCH_CUDA_ARCH_LIST=${{ inputs.torch-cuda-arch-list }}" >> $GITHUB_ENV
+          CUDA_MAJOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f1)
+          CUDA_MINOR=$(echo "${{ inputs.cuda-version }}" | cut -d. -f2)
+          echo "CUDA_SHORT=cu${CUDA_MAJOR}${CUDA_MINOR}" >> $GITHUB_ENV
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Install PyTorch
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir torch==${{ inputs.torch-version }} \
+            --index-url https://download.pytorch.org/whl/${CUDA_SHORT}
+
+      - name: Build torch-memory-saver
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-torch-memory-saver.sh
+
+      - name: Upload wheel to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER_FLAG=""
+          if [ "${{ inputs.override-previous }}" = "true" ]; then
+            CLOBBER_FLAG="--clobber"
+          fi
+          for whl in wheels/torch_memory_saver-*.whl; do
             [ -f "$whl" ] || continue
             gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then

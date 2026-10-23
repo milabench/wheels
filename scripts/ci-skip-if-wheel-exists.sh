@@ -167,6 +167,13 @@ case "$PACKAGE" in
         fi
         ;;
 
+    torch-memory-saver)
+        VER="${TORCH_MEMORY_SAVER_VERSION#v}"
+        if asset_has_arch "torch_memory_saver-${VER}-"; then
+            emit_skip "torch_memory_saver ${VER} (${ARCH})"
+        fi
+        ;;
+
     *)
         echo "::error::Unknown package for skip check: ${PACKAGE}" >&2
         exit 1

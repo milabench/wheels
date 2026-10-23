@@ -38,9 +38,9 @@ MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
 
 .PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter pyg-lib \
         torchao torchao-matrix flash-attention flash-attention-4 mslk \
-        transformer-engine torchtitan aiter mori amdsmi atom vllm clean
+        transformer-engine torch-memory-saver torchtitan aiter mori amdsmi atom vllm clean
 
-all: xformers pyg torchao flash-attention flash-attention-4 mslk transformer-engine torchtitan
+all: xformers pyg torchao flash-attention flash-attention-4 mslk transformer-engine torch-memory-saver torchtitan
 
 pyg: pytorch-cluster pytorch-sparse pytorch-scatter pyg-lib
 
@@ -106,6 +106,9 @@ mslk: $(VENV_SENTINEL)
 
 transformer-engine: $(VENV_SENTINEL)
 	bash scripts/build-transformer-engine.sh
+
+torch-memory-saver: $(VENV_SENTINEL)
+	bash scripts/build-torch-memory-saver.sh
 
 aiter: $(VENV_SENTINEL)
 	bash scripts/build-aiter.sh
