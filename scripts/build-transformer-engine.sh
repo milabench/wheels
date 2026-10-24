@@ -34,6 +34,10 @@ if [ -z "${CUDNN_PATH:-}" ]; then
     CUDNN_INC_DIR="$(find_pip_header cudnn.h || true)"
     [ -n "$CUDNN_INC_DIR" ] && export CUDNN_PATH="$(dirname "$CUDNN_INC_DIR")"
 fi
+PIP_CUDNN_INC="$(find_pip_header cudnn.h || true)"
+if [ -n "$PIP_CUDNN_INC" ]; then
+    export CPATH="${PIP_CUDNN_INC}${CPATH:+:$CPATH}"
+fi
 PIP_NVTX_INC="$(find_pip_header nvtx3/nvToolsExt.h || true)"
 if [ -n "$PIP_NVTX_INC" ]; then
     export CPATH="${PIP_NVTX_INC}${CPATH:+:$CPATH}"
@@ -67,15 +71,37 @@ for h in cuda_runtime.h cuda_fp8.h nvml.h nvtx3/nvToolsExt.h nvrtc.h cublasLt.h;
         missing=1
     fi
 done
-if [ ! -f "${CUDNN_INC}/cudnn.h" ] && [ -z "$(find_pip_header cudnn.h || true)" ]; then
-    echo "::error::missing cudnn.h (CUDNN_PATH=${CUDNN_PATH:-unset})"
-    missing=1
-fi
 if [ ! -f "${CUDA_HOME}/include/nccl.h" ] && [ -z "$PIP_NCCL_INC" ]; then
     echo "::error::missing nccl.h (not in ${CUDA_HOME}/include or pip nvidia-nccl)"
     missing=1
 fi
 [ "$missing" -eq 0 ] || exit 1
+
+# Smoke-compile every third-party header the core + torch extension include, with the
+# same include roots (CUDA toolkit, torch, CPATH). Fails in seconds instead of after
+# the ~75 min core build.
+SMOKE_DIR="$(mktemp -d)"
+cat > "$SMOKE_DIR/smoke.cpp" <<'CPP'
+#include <cuda_runtime.h>
+#include <cuda_fp8.h>
+#include <cublasLt.h>
+#include <cudnn.h>
+#include <nccl.h>
+#include <nvml.h>
+#include <nvtx3/nvToolsExt.h>
+#include <torch/extension.h>
+#include <ATen/cudnn/cudnn-wrapper.h>
+int main() { return 0; }
+CPP
+TORCH_INCLUDES="$(python3 -c 'from torch.utils.cpp_extension import include_paths; print(" ".join("-I"+p for p in include_paths()))')"
+PY_INCLUDE="-I$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')"
+if ! ${CXX:-c++} -std=c++17 -fsyntax-only -I"${CUDA_HOME}/include" ${TORCH_INCLUDES} ${PY_INCLUDE} \
+        "$SMOKE_DIR/smoke.cpp"; then
+    echo "::error::header smoke test failed (see the missing header above)"
+    exit 1
+fi
+rm -rf "$SMOKE_DIR"
+echo "==> Header smoke test passed"
 
 TAG="${TRANSFORMER_ENGINE_TAG:-v${TRANSFORMER_ENGINE_VERSION#v}}"
 git clone --branch "$TAG" --depth 1 \
