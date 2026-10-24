@@ -2,55 +2,46 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-echo "==> Building transformer-engine ${TRANSFORMER_ENGINE_VERSION} (${ACCEL_SHORT})"
+echo "==> Building transformer_engine_torch ${TRANSFORMER_ENGINE_VERSION} (${ACCEL_SHORT}, torch ${PYTORCH_VERSION})"
+
+# What this builds: only the PyTorch extension (transformer_engine_torch), the part that
+# must be rebuilt per torch version. This mirrors milabench's slime benchfile, where
+# `pip install transformer-engine[pytorch]==X` compiles transformer_engine_torch from the
+# PyPI sdist. The heavy core library (libtransformer_engine.so) is NOT built here: it is
+# the prebuilt, torch-independent `transformer_engine_cu12/cu13` wheel on PyPI.
 
 export MAX_JOBS="${MAX_JOBS:-2}"
-export NVTE_FRAMEWORK=pytorch
-export NVTE_BUILD_THREADS_PER_JOB=1
-# NCCL EP needs extra submodules/NCCL headers and is not used by milabench.
+# Without this the extension is compiled with -DNVTE_WITH_NCCL_EP and needs nccl_ep.h.
 export NVTE_WITH_NCCL_EP=0
+# The sdist first tries to download a prebuilt wheel from NVIDIA's GitHub release (it never
+# exists for our torch); force the source build.
+export NVTE_PYTORCH_FORCE_BUILD=TRUE
 
-# Arch list: leave NVTE_CUDA_ARCHS unset to use TE's own default for the toolkit
-# (CUDA 13: 75;80;89;90;100;120). Deriving it from TORCH_CUDA_ARCH_LIST breaks:
-# TE only understands bare family heads (100, 120) and splits them into generic
-# + 100a/120f itself, so extras like 12.1 get built as plain archs and fail the
-# family-specific PTX static_assert. Override explicitly via NVTE_CUDA_ARCHS if needed.
+pip install wheel setuptools cmake ninja packaging pybind11
 
-pip install wheel setuptools cmake ninja packaging pybind11 pydantic \
-    einops onnx onnxscript nvdlfw-inspect "nvidia-cudnn-frontend>=1.29.0"
-
-# cuDNN (and fallback NVTX) headers come with the torch wheel's nvidia-* dependencies.
-# CUDA 13 wheels use a shared nvidia/cu13/include; CUDA 12 uses nvidia/cudnn/include.
-find_pip_header() {
-    python3 - "$1" <<'PY'
-import glob, os, site, sys
+# Headers the extension includes that the CI toolkit install (nvcc + libraries-dev) lacks.
+# cuDNN / NCCL / NVTX come with torch's nvidia-* wheel dependencies; CUDA 13 wheels share
+# nvidia/cu13/include, CUDA 12 uses one dir per library. Add every nvidia/*/include to CPATH,
+# like slime's add_nvidia_wheel_paths does.
+PIP_NV_INCLUDES="$(python3 - <<'PY'
+import glob, os, site
+dirs = []
 for r in site.getsitepackages() + [site.getusersitepackages()]:
-    for h in glob.glob(os.path.join(r, "nvidia", "**", sys.argv[1]), recursive=True):
-        print(os.path.dirname(h)[: -len(os.path.dirname(sys.argv[1])) - 1] if os.path.dirname(sys.argv[1]) else os.path.dirname(h))
-        sys.exit(0)
+    dirs += sorted(d for d in glob.glob(os.path.join(r, "nvidia", "*", "include")) if os.path.isdir(d))
+print(os.pathsep.join(dirs))
 PY
-}
-if [ -z "${CUDNN_PATH:-}" ]; then
-    CUDNN_INC_DIR="$(find_pip_header cudnn.h || true)"
-    [ -n "$CUDNN_INC_DIR" ] && export CUDNN_PATH="$(dirname "$CUDNN_INC_DIR")"
+)"
+if [ -n "$PIP_NV_INCLUDES" ]; then
+    export CPATH="${PIP_NV_INCLUDES}${CPATH:+:$CPATH}"
 fi
-PIP_CUDNN_INC="$(find_pip_header cudnn.h || true)"
-if [ -n "$PIP_CUDNN_INC" ]; then
-    export CPATH="${PIP_CUDNN_INC}${CPATH:+:$CPATH}"
-fi
-PIP_NVTX_INC="$(find_pip_header nvtx3/nvToolsExt.h || true)"
-if [ -n "$PIP_NVTX_INC" ]; then
-    export CPATH="${PIP_NVTX_INC}${CPATH:+:$CPATH}"
-fi
-# The PyTorch extension includes nccl.h (USE_C10D_NCCL); use the same NCCL torch ships.
-PIP_NCCL_INC="$(find_pip_header nccl.h || true)"
-if [ -n "$PIP_NCCL_INC" ]; then
-    export CPATH="${PIP_NCCL_INC}${CPATH:+:$CPATH}"
-fi
+# TE locates cuDNN / NCCL through these (same as slime).
+for d in ${PIP_NV_INCLUDES//:/ }; do
+    [ -f "$d/cudnn.h" ] && export CUDNN_PATH="${CUDNN_PATH:-$(dirname "$d")}"
+    [ -f "$d/nccl.h" ] && export NCCL_HOME="${NCCL_HOME:-$(dirname "$d")}"
+done
 
-# The CI toolkit install only has nvcc + libraries-dev; TE also needs the NVML and
-# NVTX headers (nvml.h, nvtx3/nvToolsExt.h). Install them from the CUDA apt repo
-# (already configured by the toolkit step); local builds with a full toolkit skip this.
+# nvml.h / nvtx3 are not in the pip wheels' include dirs on every layout; get them from the
+# CUDA apt repo (already configured by the toolkit step) when the toolkit lacks them.
 CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
 CUDA_APT_VER="$(echo "${CUDA_VERSION}" | cut -d. -f1,2 | tr . -)"
 if [ ! -f "${CUDA_HOME}/include/nvml.h" ] || [ ! -f "${CUDA_HOME}/include/nvtx3/nvToolsExt.h" ]; then
@@ -61,59 +52,35 @@ if [ ! -f "${CUDA_HOME}/include/nvml.h" ] || [ ! -f "${CUDA_HOME}/include/nvtx3/
         echo "::warning::apt install of nvml/nvtx dev packages failed"
 fi
 
-# Fail in seconds, not after an hour of compiling, if a required header is missing.
-CUDNN_INC=""
-[ -n "${CUDNN_PATH:-}" ] && CUDNN_INC="${CUDNN_PATH}/include"
-missing=0
-for h in cuda_runtime.h cuda_fp8.h nvml.h nvtx3/nvToolsExt.h nvrtc.h cublasLt.h; do
-    if [ ! -f "${CUDA_HOME}/include/${h}" ] && [ ! -f "${PIP_NVTX_INC:-/nonexistent}/${h}" ]; then
-        echo "::error::missing ${h} under ${CUDA_HOME}/include"
-        missing=1
-    fi
-done
-if [ ! -f "${CUDA_HOME}/include/nccl.h" ] && [ -z "$PIP_NCCL_INC" ]; then
-    echo "::error::missing nccl.h (not in ${CUDA_HOME}/include or pip nvidia-nccl)"
-    missing=1
-fi
-[ "$missing" -eq 0 ] || exit 1
-
-# Smoke-compile every third-party header the core + torch extension include, with the
-# same include roots (CUDA toolkit, torch, CPATH). Fails in seconds instead of after
-# the ~75 min core build.
-SMOKE_DIR="$(mktemp -d)"
-cat > "$SMOKE_DIR/smoke.cpp" <<'CPP'
-#include <cuda_runtime.h>
-#include <cuda_fp8.h>
-#include <cublasLt.h>
-#include <cudnn.h>
-#include <nccl.h>
-#include <nvml.h>
-#include <nvtx3/nvToolsExt.h>
-#include <torch/extension.h>
-#include <ATen/cudnn/cudnn-wrapper.h>
-int main() { return 0; }
-CPP
+# Preflight: syntax-compile every extension source from the sdist with the include roots the
+# real build uses (CUDA toolkit, torch, CPATH, bundled TE headers). A missing header fails
+# here in minutes with the file and header named, not deep into the real build.
+SRC_DIR="$(mktemp -d)"
+python3 - "$SRC_DIR" "${TRANSFORMER_ENGINE_VERSION}" <<'PY'
+import json, sys, tarfile, urllib.request
+dest, ver = sys.argv[1], sys.argv[2]
+meta = json.load(urllib.request.urlopen(f"https://pypi.org/pypi/transformer-engine-torch/{ver}/json"))
+url = next(u["url"] for u in meta["urls"] if u["packagetype"] == "sdist")
+path, _ = urllib.request.urlretrieve(url, f"{dest}/sdist.tar.gz")
+tarfile.open(path).extractall(dest)
+PY
+SDIST="$(echo "$SRC_DIR"/transformer_engine_torch-*/)"
 TORCH_INCLUDES="$(python3 -c 'from torch.utils.cpp_extension import include_paths; print(" ".join("-I"+p for p in include_paths()))')"
 PY_INCLUDE="-I$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')"
-if ! ${CXX:-c++} -std=c++17 -fsyntax-only -I"${CUDA_HOME}/include" ${TORCH_INCLUDES} ${PY_INCLUDE} \
-        "$SMOKE_DIR/smoke.cpp"; then
-    echo "::error::header smoke test failed (see the missing header above)"
+NPROC="$(nproc)"
+if ! find "$SDIST/csrc" -name '*.cpp' -print0 | xargs -0 -P "$NPROC" -I{} \
+        ${CXX:-c++} -std=c++17 -fsyntax-only -DUSE_C10D_NCCL \
+        -I"${CUDA_HOME}/include" -I"$SDIST/common_headers" -I"$SDIST/common_headers/common" \
+        -I"$SDIST/common_headers/common/include" -I"$SDIST/csrc" \
+        ${TORCH_INCLUDES} ${PY_INCLUDE} {} ; then
+    echo "::error::extension preflight failed: a header is missing (see the first error above)"
     exit 1
 fi
-rm -rf "$SMOKE_DIR"
-echo "==> Header smoke test passed"
+rm -rf "$SRC_DIR"
+echo "==> Extension preflight passed"
 
-TAG="${TRANSFORMER_ENGINE_TAG:-v${TRANSFORMER_ENGINE_VERSION#v}}"
-git clone --branch "$TAG" --depth 1 \
-    https://github.com/NVIDIA/TransformerEngine.git transformer-engine-src
-(
-    cd transformer-engine-src
-    git submodule sync
-    git submodule update --init --recursive --depth 1
-
-    pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
-)
-rm -rf transformer-engine-src
+pip wheel "transformer_engine_torch==${TRANSFORMER_ENGINE_VERSION}" -v --no-cache-dir \
+    --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 
 echo "Built wheel:"
-ls "$WHEELS_DIR"/transformer_engine-*.whl
+ls "$WHEELS_DIR"/transformer_engine_torch-*.whl

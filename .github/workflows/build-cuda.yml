@@ -923,7 +923,7 @@ jobs:
           if [ "${{ inputs.override-previous }}" = "true" ]; then
             CLOBBER_FLAG="--clobber"
           fi
-          for whl in wheels/transformer_engine-*.whl; do
+          for whl in wheels/transformer_engine_torch-*.whl; do
             [ -f "$whl" ] || continue
             gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.create-release.outputs.tag }}" "$whl" $CLOBBER_FLAG 2>&1 | tee /tmp/upload.log || {
               if grep -q "already exists" /tmp/upload.log; then

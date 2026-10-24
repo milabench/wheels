@@ -161,9 +161,9 @@ case "$PACKAGE" in
 
     transformer-engine)
         VER="${TRANSFORMER_ENGINE_VERSION#v}"
-        needle="transformer_engine-${VER}-"
+        needle="transformer_engine_torch-${VER}-"
         if asset_has_arch "$needle"; then
-            emit_skip "transformer-engine ${VER} (${ARCH})"
+            emit_skip "transformer_engine_torch ${VER} (${ARCH})"
         fi
         ;;
 
