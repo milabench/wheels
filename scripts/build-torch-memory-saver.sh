@@ -6,6 +6,9 @@ echo "==> Building torch_memory_saver ${TORCH_MEMORY_SAVER_VERSION} (${ACCEL_SHO
 
 export MAX_JOBS="${MAX_JOBS:-2}"
 
+# setup.py suffixes the .so files with the CUDA major and refuses to build without it.
+export TMS_CUDA_MAJOR="${TMS_CUDA_MAJOR:-${CUDA_VERSION%%.*}}"
+
 pip install wheel setuptools packaging ninja
 
 TAG="v${TORCH_MEMORY_SAVER_VERSION#v}"
