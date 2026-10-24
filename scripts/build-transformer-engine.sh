@@ -38,6 +38,11 @@ PIP_NVTX_INC="$(find_pip_header nvtx3/nvToolsExt.h || true)"
 if [ -n "$PIP_NVTX_INC" ]; then
     export CPATH="${PIP_NVTX_INC}${CPATH:+:$CPATH}"
 fi
+# The PyTorch extension includes nccl.h (USE_C10D_NCCL); use the same NCCL torch ships.
+PIP_NCCL_INC="$(find_pip_header nccl.h || true)"
+if [ -n "$PIP_NCCL_INC" ]; then
+    export CPATH="${PIP_NCCL_INC}${CPATH:+:$CPATH}"
+fi
 
 # The CI toolkit install only has nvcc + libraries-dev; TE also needs the NVML and
 # NVTX headers (nvml.h, nvtx3/nvToolsExt.h). Install them from the CUDA apt repo
@@ -64,6 +69,10 @@ for h in cuda_runtime.h cuda_fp8.h nvml.h nvtx3/nvToolsExt.h nvrtc.h cublasLt.h;
 done
 if [ ! -f "${CUDNN_INC}/cudnn.h" ] && [ -z "$(find_pip_header cudnn.h || true)" ]; then
     echo "::error::missing cudnn.h (CUDNN_PATH=${CUDNN_PATH:-unset})"
+    missing=1
+fi
+if [ ! -f "${CUDA_HOME}/include/nccl.h" ] && [ -z "$PIP_NCCL_INC" ]; then
+    echo "::error::missing nccl.h (not in ${CUDA_HOME}/include or pip nvidia-nccl)"
     missing=1
 fi
 [ "$missing" -eq 0 ] || exit 1
