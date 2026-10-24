@@ -24,6 +24,22 @@ if [ -z "${CUDNN_PATH:-}" ]; then
     export CUDNN_PATH
 fi
 
+# NVTX headers (nvtx3/nvToolsExt.h) are not in the CI toolkit's nvcc/libraries-dev
+# sub-packages; use the ones shipped by the torch wheel's nvidia-nvtx dependency.
+NVTX_INCLUDE="$(python3 - <<'PY'
+import glob, os, site, sys
+roots = site.getsitepackages() + [site.getusersitepackages()]
+for r in roots:
+    for h in glob.glob(os.path.join(r, "nvidia", "**", "nvtx3", "nvToolsExt.h"), recursive=True):
+        print(os.path.dirname(os.path.dirname(h)))
+        sys.exit(0)
+PY
+)"
+if [ -n "$NVTX_INCLUDE" ]; then
+    echo "==> Using NVTX headers from $NVTX_INCLUDE"
+    export CPATH="${NVTX_INCLUDE}${CPATH:+:$CPATH}"
+fi
+
 TAG="v${TRANSFORMER_ENGINE_VERSION#v}"
 git clone --branch "$TAG" --depth 1 \
     https://github.com/NVIDIA/TransformerEngine.git transformer-engine-src
