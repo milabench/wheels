@@ -77,7 +77,7 @@ if [ ! -f "${CUDA_HOME}/include/nccl.h" ] && [ -z "$PIP_NCCL_INC" ]; then
 fi
 [ "$missing" -eq 0 ] || exit 1
 
-TAG="v${TRANSFORMER_ENGINE_VERSION#v}"
+TAG="${TRANSFORMER_ENGINE_TAG:-v${TRANSFORMER_ENGINE_VERSION#v}}"
 git clone --branch "$TAG" --depth 1 \
     https://github.com/NVIDIA/TransformerEngine.git transformer-engine-src
 (

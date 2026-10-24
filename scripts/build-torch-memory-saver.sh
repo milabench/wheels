@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-echo "==> Building torch_memory_saver ${TORCH_MEMORY_SAVER_VERSION} (${ACCEL_SHORT})"
+echo "==> Building torch_memory_saver ${TORCH_MEMORY_SAVER_VERSION} @ ${TORCH_MEMORY_SAVER_REF:0:8} (${ACCEL_SHORT})"
 
 export MAX_JOBS="${MAX_JOBS:-2}"
 
@@ -11,9 +11,12 @@ export TMS_CUDA_MAJOR="${TMS_CUDA_MAJOR:-${CUDA_VERSION%%.*}}"
 
 pip install wheel setuptools packaging ninja
 
-TAG="v${TORCH_MEMORY_SAVER_VERSION#v}"
-git clone --branch "$TAG" --depth 1 \
-    https://github.com/fzyzcjy/torch_memory_saver.git torch-memory-saver-src
+# Pinned to a commit (the slime fork has no tags): shallow-fetch just that ref.
+mkdir torch-memory-saver-src
+git -C torch-memory-saver-src init -q
+git -C torch-memory-saver-src remote add origin "${TORCH_MEMORY_SAVER_REPO}"
+git -C torch-memory-saver-src fetch -q --depth 1 origin "${TORCH_MEMORY_SAVER_REF}"
+git -C torch-memory-saver-src checkout -q FETCH_HEAD
 (
     cd torch-memory-saver-src
     pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
