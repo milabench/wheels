@@ -10,10 +10,11 @@ export NVTE_BUILD_THREADS_PER_JOB=1
 # NCCL EP needs extra submodules/NCCL headers and is not used by milabench.
 export NVTE_WITH_NCCL_EP=0
 
-# NVTE_CUDA_ARCHS uses "80;90" style (no dots); derive it from TORCH_CUDA_ARCH_LIST.
-if [ -z "${NVTE_CUDA_ARCHS:-}" ] && [ -n "${TORCH_CUDA_ARCH_LIST:-}" ]; then
-    export NVTE_CUDA_ARCHS="${TORCH_CUDA_ARCH_LIST//./}"
-fi
+# Arch list: leave NVTE_CUDA_ARCHS unset to use TE's own default for the toolkit
+# (CUDA 13: 75;80;89;90;100;120). Deriving it from TORCH_CUDA_ARCH_LIST breaks:
+# TE only understands bare family heads (100, 120) and splits them into generic
+# + 100a/120f itself, so extras like 12.1 get built as plain archs and fail the
+# family-specific PTX static_assert. Override explicitly via NVTE_CUDA_ARCHS if needed.
 
 pip install wheel setuptools cmake ninja packaging pybind11 pydantic \
     einops onnx onnxscript nvdlfw-inspect "nvidia-cudnn-frontend>=1.29.0"
