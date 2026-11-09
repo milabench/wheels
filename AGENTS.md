@@ -46,6 +46,41 @@ Build scripts use `ACCEL_SHORT` for version suffixes, making them backend-agnost
 
 CI infrastructure versions (Python, CUDA/ROCm, PyTorch) come from workflow inputs with defaults matching `.env`.
 
+## Building vLLM against a newer torch than it pins (forward-looking vLLM)
+
+vLLM releases lag PyTorch: when a torch minor has no vLLM release (e.g. torch 2.15, while vLLM 0.32.0 pins 2.13), build the newest vLLM against the newer torch. Each failure below costs about 1 h of self-hosted runner time to discover, so check all of them **before** dispatching. They are handled in `build-vllm.sh`; keep them working when touching it.
+
+| # | Symptom | Cause | Handled by |
+|---|---|---|---|
+| 1 | Wheel installs but declares `Requires-Dist: torch==<old>` (and `torchvision`/`torchaudio`); pin/install can't resolve | vLLM pins torch exactly in `requirements/cuda.txt` | `strip_torch_pin_if_mismatched` runs vLLM's `tools/use_existing_torch.py --prefix` when the pin differs from `PYTORCH_VERSION` |
+| 2 | `CMake Error: GCC >= 13 is required to build vLLM with CUDA (found 11.4.0)` (fails at ~5 min) | vLLM 0.32+ (DeepGEMM/DeepSelect use C++20 `<format>`); Ubuntu 22.04 has GCC 11 | `ensure_gcc13` (ubuntu-toolchain-r PPA, sets `CC`/`CXX`/`CUDAHOSTCXX`) |
+| 3 | `fatal error: elfutils/libdwfl.h` at step ~589/591 (fails at ~1 h) | DeepGEMM `deep_jit` headers | `install_cuda_build_deps` (`libdw-dev libibverbs-dev librdmacm-dev`, Ubuntu names for vLLM's Dockerfile `elfutils-devel rdma-core-devel`) |
+| 4 | Build crawls: `-DCMAKE_JOB_POOLS:STRING=compile=1` in the log | vLLM runs `MAX_JOBS / NVCC_THREADS` nvcc processes; `NVCC_THREADS == MAX_JOBS` meant one compile at a time | `ci-bootstrap-container.sh` defaults `NVCC_THREADS=2` (log shows `Using MAX_JOBS=32 NVCC_THREADS=2`). On the 32-core runner the full build takes ~1 h |
+
+Related failures in **other** packages when torch moves (same release round):
+
+- torch 2.15+ headers need C++20 (`std::strong_ordering` in `c10/util/intrusive_ptr.h`, `#error C++20 or later compatible compiler is required to use ATen`). Packages that hardcode `-std=c++17` (flash-attn `setup.py` + `hopper/setup.py`, xformers) are rewritten by `force_torch_cxx_std` (`common.sh`). The transformer-engine header preflight uses `TORCH_CXX_STD`. Packages that don't hardcode `-std` (PyG, torchao, mslk) pick up torch's own default.
+- flash-attn runs `MAX_JOBS` nvcc processes, each with `--threads NVCC_THREADS`, so its script divides `MAX_JOBS` by `NVCC_THREADS`.
+
+### Checklist before dispatching a new (torch, vLLM) pair
+
+1. Pick the vLLM version: newest release whose `requirements/cuda.txt` torch pin is ≤ the target torch:
+   ```bash
+   for t in $(gh release list --repo vllm-project/vllm --limit 10 --json tagName -q '.[].tagName'); do
+     echo "$t $(gh api "repos/vllm-project/vllm/contents/requirements/cuda.txt?ref=$t" -q .content | base64 -d | grep -E '^torch==')"
+   done
+   ```
+   Add it to `vllm-matrix.toml` (and `torchao-matrix.toml` for the new torch minor; both resolvers hard-fail on an unmapped minor).
+2. Diff vLLM's build requirements against the previous build before spending runner time:
+   - `docker/Dockerfile` system packages (`dnf install` / `apt-get install` in the build stage) → add Ubuntu equivalents to `install_cuda_build_deps`.
+   - `CMakeLists.txt` `message(FATAL_ERROR ...)` compiler/toolkit checks (`grep -n "FATAL_ERROR\|VERSION_LESS" CMakeLists.txt`).
+   - `requirements/build.txt` / `pyproject.toml` `[build-system]` Python build deps → add them to the `pip install` in `build-vllm.sh`.
+3. Dispatch vLLM alone (`-f packages=vllm`) so a failure doesn't hold up the rest. Use `-f override-previous=true` only when replacing a bad wheel. There is one x86_64 self-hosted runner and long jobs run one at a time, so don't queue jobs you already know will fail.
+4. After the job, check its log and the wheel (they're printed by `report_glibcxx`):
+   - `max GLIBCXX`: anything above `GLIBCXX_3.4.30` needs a newer libstdc++ than stock Ubuntu 22.04/RHEL at runtime. With GCC 13, `GLIBCXX_3.4.31` is expected for `_deepselect_C` and `deep_gemm/_C_extension` only (`std::to_chars(_Float128)`); the core `_C` must stay ≤ 3.4.30.
+   - Metadata: `unzip -p vllm-*.whl '*.dist-info/METADATA' | grep -E '^Requires-Dist: torch'` must not pin the old torch.
+5. Add the `"<torch>,<cuda>"` entry to milabench `platforms.toml` `[vllm.cuda]`, then `milabench pin --set cuda=<NNN> torch=<X.Y.Z>`.
+
 ## How to Add a New Package
 
 1. Add `NEW_PACKAGE_VERSION=X.Y.Z` to `.env`.
