@@ -109,13 +109,28 @@ pip --version
 
 # Resolve compile parallelism for fat self-hosted builds.
 # Workflow passes MAX_JOBS=0 to mean "use all cores".
+# MAX_JOBS is the total CPU-thread budget. NVCC_THREADS is the per-nvcc-process
+# thread count (it only parallelizes across -gencode targets), so keep it small:
+# vLLM runs MAX_JOBS / NVCC_THREADS nvcc processes (NVCC_THREADS == MAX_JOBS
+# meant a single compile at a time). Each nvcc process can take several GiB on
+# CUTLASS kernels, so also cap the process count by available memory.
+NVCC_MEM_GIB_PER_PROC="${NVCC_MEM_GIB_PER_PROC:-4}"
 if [ -z "${MAX_JOBS:-}" ] || [ "${MAX_JOBS}" = "0" ]; then
     MAX_JOBS="$(nproc)"
 fi
+export NVCC_THREADS="${NVCC_THREADS:-2}"
+MEM_AVAIL_GIB="$(awk '/MemAvailable/ {print int($2/1048576)}' /proc/meminfo)"
+MEM_CAP_JOBS=$(( (MEM_AVAIL_GIB / NVCC_MEM_GIB_PER_PROC) * NVCC_THREADS ))
+if [ "$MEM_CAP_JOBS" -lt "$NVCC_THREADS" ]; then
+    MEM_CAP_JOBS="$NVCC_THREADS"
+fi
+if [ "$MAX_JOBS" -gt "$MEM_CAP_JOBS" ]; then
+    echo "==> Capping MAX_JOBS ${MAX_JOBS} -> ${MEM_CAP_JOBS} (${MEM_AVAIL_GIB} GiB available)"
+    MAX_JOBS="$MEM_CAP_JOBS"
+fi
 export MAX_JOBS
 export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-$MAX_JOBS}"
-export NVCC_THREADS="${NVCC_THREADS:-$MAX_JOBS}"
-echo "==> Using MAX_JOBS=${MAX_JOBS} (nproc=$(nproc))"
+echo "==> Using MAX_JOBS=${MAX_JOBS} NVCC_THREADS=${NVCC_THREADS} (nproc=$(nproc), ${MEM_AVAIL_GIB} GiB available)"
 if [ -n "${GITHUB_ENV:-}" ]; then
     {
         echo "MAX_JOBS=${MAX_JOBS}"

@@ -20,6 +20,11 @@ git clone --recurse-submodules --branch "v${FLASH_ATTN_VERSION}" --depth 1 \
         export FLASH_ATTN_LOCAL_VERSION="${ACCEL_SHORT}torch${TORCH_SHORT}cxx11abiTRUE"
     else
         export NVCC_THREADS="${NVCC_THREADS:-2}"
+        # torch's ninja build runs MAX_JOBS nvcc processes, each with
+        # --threads NVCC_THREADS: split the thread budget between them.
+        MAX_JOBS=$(( MAX_JOBS / NVCC_THREADS ))
+        [ "$MAX_JOBS" -ge 1 ] || MAX_JOBS=1
+        export MAX_JOBS
         export FLASH_ATTN_LOCAL_VERSION="cu${WHEEL_CUDA_VERSION}torch${TORCH_SHORT}cxx11abiTRUE"
     fi
 
