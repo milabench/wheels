@@ -10,6 +10,7 @@ git clone --recurse-submodules --branch "v${FLASH_ATTN_VERSION}" --depth 1 \
     https://github.com/Dao-AILab/flash-attention.git
 (
     cd flash-attention
+    force_torch_cxx_std setup.py hopper/setup.py
     export FLASH_ATTENTION_FORCE_CXX11_ABI="TRUE"
     export MAX_JOBS="${MAX_JOBS:-2}"
     export FLASH_ATTENTION_FORCE_BUILD="TRUE"

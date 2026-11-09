@@ -69,7 +69,7 @@ TORCH_INCLUDES="$(python3 -c 'from torch.utils.cpp_extension import include_path
 PY_INCLUDE="-I$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')"
 NPROC="$(nproc)"
 if ! find "$SDIST/csrc" -name '*.cpp' -print0 | xargs -0 -P "$NPROC" -I{} \
-        ${CXX:-c++} -std=c++17 -fsyntax-only -DUSE_C10D_NCCL \
+        ${CXX:-c++} -std=${TORCH_CXX_STD} -fsyntax-only -DUSE_C10D_NCCL \
         -I"${CUDA_HOME}/include" -I"$SDIST/common_headers" -I"$SDIST/common_headers/common" \
         -I"$SDIST/common_headers/common/include" -I"$SDIST/csrc" \
         ${TORCH_INCLUDES} ${PY_INCLUDE} {} ; then

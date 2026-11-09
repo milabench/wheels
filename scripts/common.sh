@@ -28,6 +28,28 @@ TORCH_MINOR="${_rest%%.*}"
 export PT_VER="pt${TORCH_MAJOR}${TORCH_MINOR}"
 export TORCH_SHORT="${TORCH_MAJOR}.${TORCH_MINOR}"
 
+# torch 2.15+ headers require C++20 (std::strong_ordering in
+# c10/util/intrusive_ptr.h) and cpp_extension defaults to -std=c++20. Packages
+# that hardcode -std=c++17 in setup.py (flash-attn, xformers) must be patched.
+if [ "$TORCH_MAJOR" -gt 2 ] || { [ "$TORCH_MAJOR" -eq 2 ] && [ "$TORCH_MINOR" -ge 15 ]; }; then
+    export TORCH_CXX_STD="c++20"
+else
+    export TORCH_CXX_STD="c++17"
+fi
+
+# Rewrite -std=c++17 to the torch-required standard in the given files.
+force_torch_cxx_std() {
+    [ "$TORCH_CXX_STD" = "c++17" ] && return 0
+    local f
+    for f in "$@"; do
+        if [ -f "$f" ] && grep -q 'std[=:]c++17' "$f"; then
+            sed -i "s/-std=c++17/-std=${TORCH_CXX_STD}/g; s#/std:c++17#/std:${TORCH_CXX_STD}#g" "$f"
+            echo "==> ${f}: c++17 -> ${TORCH_CXX_STD}"
+        fi
+    done
+    return 0
+}
+
 # Backend-specific derived strings
 if [ "$GPU_BACKEND" = "rocm" ]; then
     ROCM_MAJOR="${ROCM_VERSION%%.*}"

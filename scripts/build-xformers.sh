@@ -12,6 +12,7 @@ git clone --recurse-submodules --branch "v${XFORMERS_VERSION}" --depth 1 \
     https://github.com/facebookresearch/xformers.git
 (
     cd xformers
+    force_torch_cxx_std setup.py
 
     if [ "$GPU_BACKEND" = "cuda" ]; then
         python3 -c "
