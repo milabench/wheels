@@ -19,6 +19,10 @@
 #   2.11 -> 0.20.2 .. 0.26.0 pin torch 2.11 (highest: 0.26.0)
 #   2.12 -> no vLLM release targets torch 2.12 (vLLM went 2.11 -> 2.13)
 #   2.13 -> 0.27.0 / 0.27.1 pin torch 2.13 (highest: 0.27.1)
+#   2.15 -> no vLLM release targets torch 2.15 yet (0.32.0 pins 2.13,
+#           0.33.0rc3 pins 2.14). Build 0.32.0 against 2.15 with its torch
+#           pin ignored (build-vllm.sh re-asserts the target torch), same as
+#           the torch2.15-rocm10.0 release.
 # torch 2.12 is intentionally omitted: there is no compatible vLLM, so it
 # falls back to VLLM_VERSION from .env (with a warning) if ever dispatched.
 [vllm]
@@ -26,3 +30,4 @@
 "2.11" = "0.26.0"
 "2.12" = "0.26.0"
 "2.13" = "0.27.1"
+"2.15" = "0.32.0"
