@@ -77,6 +77,22 @@ ensure_gcc13() {
     echo "==> Using $(g++-13 --version | head -1)"
 }
 
+# System headers vLLM's own builder image installs (docker/Dockerfile:
+# elfutils-devel, rdma-core-devel). DeepGEMM's deep_jit includes
+# <elfutils/libdwfl.h> (vLLM 0.32+).
+install_cuda_build_deps() {
+    local pkgs=(libdw-dev libibverbs-dev librdmacm-dev) missing=() p
+    for p in "${pkgs[@]}"; do
+        dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    [ "${#missing[@]}" -eq 0 ] && return
+    echo "==> Installing vLLM CUDA build deps: ${missing[*]}"
+    local SUDO=""
+    [ "$(id -u)" -eq 0 ] || SUDO="sudo"
+    $SUDO apt-get update
+    $SUDO apt-get install -y --no-install-recommends "${missing[@]}"
+}
+
 # Highest GLIBCXX symbol version the built .so files need: anything above
 # 3.4.30 (GCC 12) needs a newer libstdc++ than stock Ubuntu 22.04 at runtime.
 report_glibcxx() {
@@ -88,6 +104,8 @@ report_glibcxx() {
         python3 -m zipfile -e "$whl" "$tmp" >/dev/null
         echo "==> $(basename "$whl") max GLIBCXX: $(find "$tmp" -name '*.so' -exec objdump -T {} + 2>/dev/null \
             | grep -o 'GLIBCXX_[0-9.]*' | sort -uV | tail -1)"
+        echo "==> $(basename "$whl") NEEDED system libs: $(find "$tmp" -name '*.so' -exec objdump -p {} + 2>/dev/null \
+            | awk '/NEEDED/ {print $2}' | grep -vE '^(lib(c|m|dl|rt|pthread|gcc_s|stdc\+\+)\.so|ld-linux|libtorch|libc10|libcuda|libcudart|libnv|libcublas|lib_)' | sort -u | tr '\n' ' ')"
         rm -rf "$tmp"
     done
 }
@@ -142,6 +160,7 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
         export VLLM_TARGET_DEVICE=cuda
         export FORCE_CUDA=1
         ensure_gcc13
+        install_cuda_build_deps
     fi
 
     reinstall_torch
