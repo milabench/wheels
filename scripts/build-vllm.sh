@@ -93,6 +93,28 @@ install_cuda_build_deps() {
     $SUDO apt-get install -y --no-install-recommends "${missing[@]}"
 }
 
+# vLLM pins torch/torchvision/torchaudio exactly in requirements/cuda.txt. When
+# building against a different torch (e.g. 0.32.0, which pins 2.13, against
+# 2.15), strip those pins with vLLM's own tool so the wheel does not declare
+# Requires-Dist: torch==<other version>. milabench's [compat.*] tables pick the
+# matching torchvision/torchaudio. Run from the vLLM checkout.
+strip_torch_pin_if_mismatched() {
+    local pinned tool
+    pinned="$(grep -oE '^torch==[0-9.]+' requirements/cuda.txt 2>/dev/null | head -1 | cut -d= -f3)"
+    if [ -z "$pinned" ] || [ "$pinned" = "$PYTORCH_VERSION" ]; then
+        return
+    fi
+    for tool in tools/use_existing_torch.py use_existing_torch.py; do
+        if [ -f "$tool" ]; then
+            echo "==> vLLM pins torch==${pinned}, building against ${PYTORCH_VERSION}: stripping torch pins"
+            python3 "$tool" --prefix
+            return
+        fi
+    done
+    echo "ERROR: vLLM pins torch==${pinned} but use_existing_torch.py was not found" >&2
+    exit 1
+}
+
 # Highest GLIBCXX symbol version the built .so files need: anything above
 # 3.4.30 (GCC 12) needs a newer libstdc++ than stock Ubuntu 22.04 at runtime.
 report_glibcxx() {
@@ -161,6 +183,7 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
         export FORCE_CUDA=1
         ensure_gcc13
         install_cuda_build_deps
+        strip_torch_pin_if_mismatched
     fi
 
     reinstall_torch
