@@ -53,6 +53,45 @@ if backend == "cuda" and torch.version.cuda is None:
 PY
 }
 
+# vLLM 0.32+ CUDA builds require GCC >= 13 (DeepGEMM/DeepSelect use C++20
+# <format> in host code; vllm-project/vllm#58158). Ubuntu 22.04 ships GCC 11,
+# so install gcc-13 from the ubuntu-toolchain-r PPA and use it for both the
+# host C++ compiler and nvcc's host compiler (CUDA 13.x supports GCC 13).
+ensure_gcc13() {
+    local major
+    major="$(${CXX:-g++} -dumpversion 2>/dev/null | cut -d. -f1 || echo 0)"
+    if [ "${major:-0}" -ge 13 ]; then
+        return
+    fi
+    if ! command -v g++-13 >/dev/null 2>&1; then
+        echo "==> Installing gcc-13 (found GCC ${major})"
+        local SUDO=""
+        [ "$(id -u)" -eq 0 ] || SUDO="sudo"
+        $SUDO apt-get update
+        $SUDO apt-get install -y --no-install-recommends software-properties-common gpg-agent
+        $SUDO add-apt-repository -y ppa:ubuntu-toolchain-r/test
+        $SUDO apt-get update
+        $SUDO apt-get install -y --no-install-recommends gcc-13 g++-13
+    fi
+    export CC=gcc-13 CXX=g++-13 CUDAHOSTCXX=g++-13
+    echo "==> Using $(g++-13 --version | head -1)"
+}
+
+# Highest GLIBCXX symbol version the built .so files need: anything above
+# 3.4.30 (GCC 12) needs a newer libstdc++ than stock Ubuntu 22.04 at runtime.
+report_glibcxx() {
+    local whl
+    for whl in "$WHEELS_DIR"/vllm-*.whl; do
+        [ -f "$whl" ] || continue
+        local tmp
+        tmp="$(mktemp -d)"
+        python3 -m zipfile -e "$whl" "$tmp" >/dev/null
+        echo "==> $(basename "$whl") max GLIBCXX: $(find "$tmp" -name '*.so' -exec objdump -T {} + 2>/dev/null \
+            | grep -o 'GLIBCXX_[0-9.]*' | sort -uV | tail -1)"
+        rm -rf "$tmp"
+    done
+}
+
 git clone --branch "v${VLLM_VERSION}" --depth 1 \
     https://github.com/vllm-project/vllm.git
 (
@@ -102,6 +141,7 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
     else
         export VLLM_TARGET_DEVICE=cuda
         export FORCE_CUDA=1
+        ensure_gcc13
     fi
 
     reinstall_torch
@@ -127,3 +167,4 @@ git clone --branch "v${VLLM_VERSION}" --depth 1 \
     pip wheel . -v --no-cache-dir --no-deps --no-build-isolation -w "$WHEELS_DIR/"
 )
 rm -rf vllm
+report_glibcxx || true
