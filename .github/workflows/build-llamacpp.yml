@@ -1,0 +1,180 @@
+name: Build llama.cpp
+
+# llama.cpp binaries (llama-server, llama-bench, llama-cli) for milabench's llamacpp benchmarks.
+# Not wheels and not tied to torch: one release per llama.cpp tag, `llamacpp-<ref>`, apart from the
+# torch{X.Y}-cu{NNN} wheel releases. Assets: llama.cpp-<ref>-<backend>-ubuntu22.04-<arch>.tar.gz
+# (backend: cuda13.0 / vulkan / cpu), built by scripts/build-llamacpp.sh.
+
+on:
+  workflow_dispatch:
+    inputs:
+      llamacpp-ref:
+        description: "llama.cpp tag (bNNNNN; empty = LLAMACPP_REF from .env)"
+        type: string
+        default: ""
+      backends:
+        description: "Comma-separated: cuda,vulkan,cpu"
+        type: string
+        default: "cuda,vulkan"
+      cuda-version:
+        description: "CUDA toolkit (the torch wheels' CUDA; 13.0 runs on driver 580+)"
+        type: string
+        default: "13.0.0"
+      cuda-archs:
+        description: "CMAKE_CUDA_ARCHITECTURES (empty = LLAMACPP_CUDA_ARCHS from .env)"
+        type: string
+        default: ""
+      runs-on-long:
+        description: "Base labels for the CUDA builds (self-hosted); X64/ARM64 is appended from the job arch"
+        type: string
+        default: '["self-hosted","linux","cpu"]'
+      container-image:
+        description: "Build container (Ubuntu 22.04: the glibc of the wheels)"
+        type: string
+        default: "ubuntu:22.04"
+      max-jobs-long:
+        description: "Compile parallelism for the CUDA builds (0 = nproc)"
+        type: string
+        default: "0"
+      upload-to-release:
+        description: "Upload the tarballs to the llamacpp-<ref> release"
+        type: boolean
+        default: true
+      override-previous:
+        description: "Replace assets with the same name"
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash -x -e -u -o pipefail {0}
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.plan.outputs.ref }}
+      tag: ${{ steps.plan.outputs.tag }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        env:
+          REF_INPUT: ${{ inputs.llamacpp-ref }}
+          BACKENDS: ${{ inputs.backends }}
+          LONG: ${{ inputs.runs-on-long }}
+        run: |
+          REF="${REF_INPUT:-$(grep -E '^LLAMACPP_REF=' .env | cut -d= -f2)}"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "tag=llamacpp-$REF" >> "$GITHUB_OUTPUT"
+          # CUDA on the long self-hosted runners (many arch targets), Vulkan / CPU on GitHub-hosted ones
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          long = json.loads(os.environ["LONG"])
+          hosted = {"x86_64": "ubuntu-22.04", "aarch64": "ubuntu-22.04-arm"}
+          legs = []
+          for backend in [b.strip() for b in os.environ["BACKENDS"].split(",") if b.strip()]:
+              for arch, label in (("x86_64", "X64"), ("aarch64", "ARM64")):
+                  runner = long + [label] if backend == "cuda" else hosted[arch]
+                  # arm64 Vulkan: no LunarG SDK, jammy's Vulkan packages may be too old
+                  legs.append({"backend": backend, "arch": arch, "runner": runner,
+                               "optional": backend == "vulkan" and arch == "aarch64"})
+          print("matrix=" + json.dumps({"include": legs}))
+          EOF
+
+  create-release:
+    name: Create release
+    needs: [plan]
+    if: ${{ inputs.upload-to-release }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create release (if it does not exist)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          REF: ${{ needs.plan.outputs.ref }}
+        run: |
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TAG" \
+            --notes "llama.cpp $REF binaries for milabench (https://github.com/ggml-org/llama.cpp/releases/tag/$REF), built on Ubuntu 22.04 by scripts/build-llamacpp.sh. CUDA builds need libcudart.so.13 / libcublas.so.13 on the loader path: a CUDA toolkit, or a torch cu13x venv (site-packages/nvidia/cu13/lib)." \
+            2>/dev/null || true
+
+  build:
+    name: llama.cpp ${{ matrix.backend }} (${{ matrix.arch }})
+    needs: [plan, create-release]
+    if: ${{ always() && !cancelled() && needs.plan.result == 'success' }}
+    timeout-minutes: 720
+    continue-on-error: ${{ matrix.optional }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ${{ inputs.container-image }}
+    env:
+      WHEELS_IN_CONTAINER: "1"
+      MAX_JOBS: ${{ matrix.backend == 'cuda' && inputs.max-jobs-long || '0' }}
+      LLAMACPP_REF: ${{ needs.plan.outputs.ref }}
+      CUDA_VERSION: ${{ inputs.cuda-version }}
+      GPU_BACKEND: cuda
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bootstrap container
+        env:
+          PYTHON_VERSION: "3.12"
+        run: bash scripts/ci-bootstrap-container.sh
+
+      - name: Asset name
+        id: asset
+        run: |
+          NAME="llama.cpp-${LLAMACPP_REF}-${{ matrix.backend }}"
+          [ "${{ matrix.backend }}" = cuda ] && NAME+="${CUDA_VERSION%.*}"
+          echo "name=${NAME}-ubuntu22.04-${{ matrix.arch }}.tar.gz" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ inputs.cuda-archs }}" ]; then echo "LLAMACPP_CUDA_ARCHS=${{ inputs.cuda-archs }}" >> "$GITHUB_ENV"; fi
+
+      - name: Check if the asset already exists
+        id: check
+        if: ${{ inputs.upload-to-release && !inputs.override-previous }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ needs.plan.outputs.tag }}" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' \
+              | grep -qxF "${{ steps.asset.outputs.name }}"; then
+            echo "::notice::${{ steps.asset.outputs.name }} already in the release, skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install CUDA ${{ inputs.cuda-version }}
+        if: ${{ steps.check.outputs.skip != 'true' && matrix.backend == 'cuda' }}
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: ${{ inputs.cuda-version }}
+          linux-local-args: '["--toolkit"]'
+          method: "network"
+          sub-packages: '["nvcc", "libraries-dev"]'
+
+      - name: Build
+        if: ${{ steps.check.outputs.skip != 'true' }}
+        run: bash scripts/build-llamacpp.sh "${{ matrix.backend }}"
+
+      - name: Upload to release
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.upload-to-release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLOBBER=""
+          [ "${{ inputs.override-previous }}" = "true" ] && CLOBBER="--clobber"
+          gh release upload -R "$GITHUB_REPOSITORY" "${{ needs.plan.outputs.tag }}" \
+            "llamacpp-dist/${{ steps.asset.outputs.name }}" $CLOBBER
+
+      - name: Upload artifact (no release)
+        if: ${{ steps.check.outputs.skip != 'true' && !inputs.upload-to-release }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.asset.outputs.name }}
+          path: llamacpp-dist/${{ steps.asset.outputs.name }}

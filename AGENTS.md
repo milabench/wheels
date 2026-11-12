@@ -15,6 +15,7 @@ Builds GPU extension wheels for milabench. Each wheel is built from source again
 - `.github/workflows/build-cuda.yml` — CUDA CI workflow. Builds all wheels in parallel (x86_64 + aarch64), uploads to a GitHub release.
 - `.github/workflows/build-rocm.yml` — ROCm CI workflow. Builds GPU wheels for ROCm (x86_64 only), uploads to a separate release.
 - `.github/workflows/build-xpu.yml` — XPU (Intel GPU) CI workflow. Builds vLLM for XPU (x86_64 only), uploads to a separate release.
+- `.github/workflows/build-llamacpp.yml` — llama.cpp binaries (not wheels, no torch): CUDA + Vulkan tarballs (x86_64 + aarch64) into their own release `llamacpp-<ref>`. See **llama.cpp** below.
 - `scripts/ci-install-oneapi.sh` — Install Intel oneAPI toolkit (DPC++ compiler + oneMKL) from Intel's apt repo. Used by `build-xpu.yml`.
 - `scripts/trigger-rocm-ci.py` — Discover torch+ROCm combos on the official PyTorch index and dispatch `build-rocm.yml` (dry-run by default; `--trigger` to run).
 - `scripts/trigger-cuda-ci.py` — Same for CUDA / `build-cuda.yml` (`cu130` ↔ toolkit `13.0.0`).
@@ -117,6 +118,18 @@ Related failures in **other** packages when torch moves (same release round):
 | mslk | `MSLK_VERSION` | `v{VERSION}` | `mslk-` | CUDA + ROCm. Built from [meta-pytorch/MSLK](https://github.com/meta-pytorch/MSLK) with `BUILD_FROM_NOVA=0` so the wheel is named `mslk` with `+cuXXX` / `+rocmM.m.PATCH` local version (ROCm patch comes from the toolkit, e.g. `+rocm7.2.26015`). Needs recursive git submodules. Match version to PyTorch via milabench `[compat.mslk]`. |
 | transformer-engine | `TRANSFORMER_ENGINE_VERSION` | PyPI sdist | `transformer_engine_torch-` | CUDA only. Builds **only the PyTorch extension** (`transformer_engine_torch`) from its PyPI sdist, exactly like milabench's slime benchfile (`pip install transformer-engine[pytorch]==X`). The core library is the prebuilt, torch-independent `transformer_engine_cu12/cu13` wheel on PyPI and is **not** built here (building it from the git repo takes ~75 min and produces a conflicting single `transformer_engine` wheel). Pinned to 2.18.0 to match slime's Megatron-LM pin. `NVTE_PYTORCH_FORCE_BUILD=TRUE` skips the sdist's prebuilt-wheel download; `NVTE_WITH_NCCL_EP=0`. Headers (cuDNN/NCCL/NVTX) come from torch's `nvidia-*` wheels via `CPATH`; `nvml`/`nvtx` apt-installed if missing. A preflight syntax-compiles every extension source first so missing headers fail in minutes. |
 | torch-memory-saver | `TORCH_MEMORY_SAVER_REPO` / `_REF` / `_VERSION` | commit SHA | `torch_memory_saver-` | CUDA. Built from the **zhuzilin fork** pinned to a commit, matching milabench `benchmarks/slime/benchfile.py` (not fzyzcjy/torch_memory_saver). Version is whatever its `setup.py` says (`0.0.9.post1+slime`); keep `_VERSION` in sync for skip-existing. Needs `TMS_CUDA_MAJOR` (set from `CUDA_VERSION`). abi3 ext, plain `pip wheel`. |
+
+## llama.cpp (binaries, own release)
+
+`scripts/build-llamacpp.sh <cuda|vulkan|cpu>` builds llama.cpp tag `LLAMACPP_REF` (`.env`) into `llamacpp-dist/llama.cpp-<ref>-<backend>-ubuntu22.04-<arch>.tar.gz` (backend `cuda13.0`, `vulkan`, `cpu`): one flat folder with `llama-server`, `llama-bench`, `llama-cli`, the `libggml-*.so` backend modules (`GGML_BACKEND_DL`, RPATH `$ORIGIN`), `LICENSE` and `BUILD-INFO`. Same layout as upstream's release tarballs.
+
+- **Own release:** `llamacpp-<ref>` (`build-llamacpp.yml`), not the `torch{X.Y}-cu{NNN}` releases: the binaries don't link torch. A new llama.cpp tag is a new release; dispatch with `-f llamacpp-ref=bNNNNN` or bump `LLAMACPP_REF`.
+- **Why not upstream's binaries:** they are built on Ubuntu 24.04 (glibc 2.39) against CUDA 13.5 (driver newer than 580) with a generic arch set. Here: Ubuntu 22.04, the CUDA of the torch wheels (13.0), SASS for the GPUs milabench runs (`LLAMACPP_CUDA_ARCHS`; Blackwell as `100a/120a/121a-real`, the variants with the FP4/MXFP4 tensor-core paths).
+- **CUDA runtime not bundled** (`libcublasLt` alone is ~0.5 GB): `libcudart.so.13` / `libcublas.so.13` come from a CUDA toolkit or a torch cu13x venv (`site-packages/nvidia/cu13/lib`), which milabench puts on `LD_LIBRARY_PATH`.
+- **CPU code:** x86_64 uses `GGML_CPU_ALL_VARIANTS` (one module per x86 level, picked at runtime). aarch64 builds one `armv8.2-a+fp16+dotprod` module: GCC 11 can't build upstream's armv9 `sme` variant.
+- **Vulkan:** x86_64 uses the LunarG SDK (jammy's headers are too old), as upstream does. arm64 has no LunarG SDK, so it tries jammy's `libvulkan-dev glslc`; that CI leg is `continue-on-error`.
+- **Runners:** CUDA legs (8 arch targets) on `runs-on-long` in `ubuntu:22.04`; Vulkan/CPU on GitHub-hosted `ubuntu-22.04(-arm)` in the same container.
+- Local: `make llamacpp LLAMACPP_BACKEND=cuda` (`LLAMACPP_SKIP_DEPS=1` when cmake >= 3.28 / ninja / the toolkit are already installed).
 
 ## Key Env Vars in Build Scripts
 

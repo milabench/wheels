@@ -38,7 +38,7 @@ MATRIX_CUDA_VERSIONS    ?= 13.0.0 13.2.0
 
 .PHONY: all matrix xformers pyg pytorch-cluster pytorch-sparse pytorch-scatter pyg-lib \
         torchao torchao-matrix flash-attention flash-attention-4 mslk \
-        transformer-engine torch-memory-saver torchtitan aiter mori amdsmi atom vllm clean
+        transformer-engine torch-memory-saver torchtitan aiter mori amdsmi atom vllm llamacpp clean
 
 all: xformers pyg torchao flash-attention flash-attention-4 mslk transformer-engine torch-memory-saver torchtitan
 
@@ -130,5 +130,10 @@ endif
 # XPU: only vllm needs source compilation; all other packages come from download.pytorch.org/whl/xpu
 	bash scripts/build-vllm.sh
 
+# llama.cpp binaries (not a wheel, no torch): LLAMACPP_BACKEND=cuda|vulkan|cpu -> llamacpp-dist/*.tar.gz
+LLAMACPP_BACKEND ?= cuda
+llamacpp:
+	bash scripts/build-llamacpp.sh $(LLAMACPP_BACKEND)
+
 clean:
-	rm -rf wheels/ .venv-*/
+	rm -rf wheels/ llamacpp-dist/ .venv-*/
